@@ -20,6 +20,18 @@ server costs nothing to call.
 
 ## Quick install
 
+With [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask notime2/tap/typer-on
+```
+
+The cask verifies the DMG's SHA-256 checksum and clears the quarantine flag for
+you, so continue from step 4 below. Update later with
+`brew upgrade --cask typer-on`.
+
+Or install the DMG by hand:
+
 1. Download `TyperOn-<version>.dmg` from the
    [latest release](https://github.com/notime2/Typer-on-macos/releases/latest).
 2. Open the DMG and drag **Typer On** into **Applications**.
@@ -35,7 +47,7 @@ server costs nothing to call.
 5. Grant Accessibility access, then add an OpenRouter key or a local endpoint in
    **Settings -> API**. See [First launch](#first-launch) for details.
 
-Requires macOS Tahoe 26 or later. Each release also lists the DMG's SHA-256
+Requires macOS Tahoe 26 or later on Apple Silicon. Each release also lists the DMG's SHA-256
 checksum. Clear the quarantine flag only for a DMG downloaded from this
 repository's releases page. After installing a new version, macOS may ask for
 Accessibility access again. To build the app yourself, see
