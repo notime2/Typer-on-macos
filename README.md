@@ -80,16 +80,17 @@ Updates come from this repository's releases, are verified with an EdDSA
 signature, and keep your settings.
 
 Releases from `0.3.0` on are signed with the same self-signed identity, so an
-update keeps its Accessibility access and should keep its access to the API
-keys in your Keychain. Moving from `0.2.0` or earlier to `0.3.0` or later needs two
-one-time steps, because earlier builds were ad-hoc signed:
+update keeps its Accessibility access. Your saved API keys stay in the
+Keychain, but after every update macOS asks for your login keychain password
+once per saved key: the identity has no Apple Team ID, so the Keychain grants
+access to one exact build rather than to the identity. Choose **Always
+Allow**; it holds until the next update.
 
-- **Accessibility.** The existing **Typer On** entry in **System Settings ->
-  Privacy & Security -> Accessibility** still looks enabled but no longer
-  applies. Remove it with **-**, then add `/Applications/Typer On.app` again
-  with **+** and switch it on.
-- **Keychain.** macOS asks for your login keychain password once per saved API
-  key. Choose **Always Allow**.
+Moving from `0.2.0` or earlier to `0.3.0` or later needs one more step, because
+earlier builds were ad-hoc signed: the existing **Typer On** entry in **System
+Settings -> Privacy & Security -> Accessibility** still looks enabled but no
+longer applies. Remove it with **-**, then add `/Applications/Typer On.app`
+again with **+** and switch it on.
 
 **Development status:** the project is configured as version `0.3.1`. Release
 DMGs are built by GitHub Actions and signed with the project's self-signed
