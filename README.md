@@ -385,12 +385,23 @@ Selection detection is local. Selected text and screenshots are sent for AI
 processing when you invoke a processing module or send a chat message, not
 merely because the floating toolbar or a chat window is shown.
 
-**The app is not network-idle until the first prompt.** With a saved key, or with
-a local endpoint configured, startup can refresh the model catalog of the active
-provider. Catalog refresh and exact-model
-metadata resolution also make network requests independently of text generation.
-These requests do not include your selected text or screenshots. The current
-network implementation is in
+**The app is not network-idle until the first prompt.** Two kinds of background
+request are made independently of text generation:
+
+- **Model catalog** (`GET /models` of the active provider): at launch and after
+  you save `Settings -> API`, save or clear the key from the status bar, or pick
+  a model in the status bar `Model` menu, provided an OpenRouter key is saved or
+  a valid local base URL is configured; also when you press refresh in a model
+  picker or run **Test Connection**.
+- **Model metadata** (`GET https://openrouter.ai/api/v1/model/{author}/{slug}`,
+  OpenRouter only): in Chat Mode, only when the loaded catalog has no complete
+  entry for the Chat model: on opening the Chat window, when the catalog or AI
+  settings change while it is open, and before a screenshot is captured or a
+  conversation with a screenshot is sent or retried.
+
+Both carry at most the API key (metadata also has the model ID in its URL) and
+never your selected text, prompts, or screenshots. The current network implementation
+is in
 [AIEndpointService](TyperOn/Sources/AI/AIEndpointService.swift) and
 [ModelCatalogService](TyperOn/Sources/AI/ModelCatalogService.swift).
 
@@ -406,9 +417,8 @@ can temporarily use the clipboard; screenshot capture does not use it.
 With the local provider, the only host contacted is the endpoint you configured,
 and the OpenRouter Images API is never used. Content sent to OpenRouter is also
 subject to OpenRouter's and the selected provider's data policies. Typer On cannot guarantee their retention or handling
-of that content. See [PRIVACY.md](PRIVACY.md) for the broader data-handling notes;
-the network behavior summarized above includes startup catalog refresh and
-per-model metadata requests.
+of that content. See [PRIVACY.md](PRIVACY.md) for the complete endpoint list and
+data-handling notes.
 
 ## Development and testing
 

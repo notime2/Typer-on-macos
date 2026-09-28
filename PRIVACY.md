@@ -9,20 +9,30 @@ to your data. Everything below is verifiable in this repository.
 - Typer On has no backend. There is no Typer On server, account, or login.
 - The only host the app ever contacts is `openrouter.ai` with your own API key,
   or, if you select the OpenAI-compatible provider, the endpoint you configured
-  yourself - and only when you explicitly run a module or send a chat message.
+  yourself.
+- Your text and screenshots are sent only when you explicitly run a module or
+  send a chat message. The app also fetches the model list and model metadata
+  in the background; those requests carry at most your API key and no text.
 - There is no telemetry, no analytics, no crash reporting, and no third-party
   SDK of any kind.
 
 ## What leaves your Mac
 
 With the default OpenRouter provider, the app makes network requests to exactly
-three endpoints, all on `openrouter.ai`:
+four endpoints, all on `openrouter.ai`:
 
 | Endpoint | When | What is sent |
 |----------|------|--------------|
 | `POST /api/v1/chat/completions` | You run a module on selected text, or send a chat message | The system prompt, your text, and any attached screenshot |
 | `POST /api/v1/images` | You send a chat message to a model with image output | The prompt and the latest session screenshot as an input reference |
-| `GET /api/v1/models` | Settings opens the model catalog | Nothing but your key, to authorize the request |
+| `GET /api/v1/models` | At launch if a global API key is saved; again after you save `Settings -> API`, save or clear the key from the status bar, or pick a model in the status bar `Model` menu; and when you press refresh in a model picker | Nothing but your key, to authorize the request |
+| `GET /api/v1/model/{author}/{slug}` | Chat Mode only, when the loaded model list has no complete entry for the Chat model (for example a manually entered model ID, or before the list has loaded): when the Chat window opens, when the model list or AI settings change while it is open, before a screenshot is captured, and before a message or retry is sent in a conversation that contains a screenshot. The result is kept in memory for the session | Your key, plus the model ID in the URL path |
+
+The two `GET` requests have no request body. They never include selected text,
+prompts, chat history, or screenshots. A refresh in `Settings -> API` uses the
+key currently in the key field; a refresh in a module's model picker uses the
+key entered or saved for that module, otherwise the global key. Model metadata
+is requested with the key of the `Chat Mode` module configuration.
 
 Every request carries your OpenRouter API key as a `Bearer` token and two
 attribution headers, `X-Title: Typer On` and
@@ -33,10 +43,15 @@ every install. No other identifier is attached.
 If you switch the provider in `Settings -> API` to **OpenAI-compatible (local)**,
 `openrouter.ai` is not contacted at all. Requests go to the base URL you entered
 and nowhere else: `POST {base URL}/chat/completions` when you run a module or
-send a chat message, and `GET {base URL}/models` for the model list and for
-**Test Connection**. No OpenRouter attribution headers are sent, an `Authorization: Bearer`
-header is added only if you saved a key for that endpoint, and the OpenRouter
-Images API is never used. Plain `http` is accepted only for local and
+send a chat message, and `GET {base URL}/models` for the model list. The model
+list is requested at launch and after the same configuration changes as above
+whenever a valid base URL is saved (a key is optional), when you press refresh
+in a model picker, and by **Test Connection**, which requests it once for the
+check and once more to fill the list after a successful check. That `GET`
+carries no text and no body. Per-model metadata is never requested from a local
+endpoint. No OpenRouter attribution headers are sent, an `Authorization: Bearer`
+header is added only when a key is entered or saved for that endpoint, and the
+OpenRouter Images API is never used. Plain `http` is accepted only for local and
 private-network addresses.
 
 Once your text reaches OpenRouter, it is governed by
@@ -46,9 +61,12 @@ into or control over that. If you process confidential material, choose your
 model accordingly - OpenRouter exposes per-model data-retention settings in
 your account.
 
-Nothing is sent when the app is merely running. Auto-detecting a selection and
-showing the floating toolbar happens entirely on-device; no network request is
-made until you pick a module.
+Auto-detecting a selection and showing the floating toolbar happen entirely
+on-device and never make a network request, and no text leaves your Mac until
+you run a module or send a chat message. The app is not network-idle before
+that, though: the model-list and model-metadata requests described above run
+in the background at launch, after configuration changes, and in Chat Mode.
+They carry at most your API key (and, for metadata, the model ID).
 
 ## What stays on your Mac
 
@@ -128,8 +146,11 @@ check it rather than take it on faith:
 grep -rE 'https?://' TyperOn/Sources --include='*.swift'
 ```
 
-That should return `openrouter.ai` endpoints plus the `http://localhost:11434/v1`
-and `http://localhost:1234/v1` examples shown in the local-endpoint settings, and
-nothing else. Every other address comes from the base URL you type in
-`Settings -> API`. Watching the app with Little Snitch, LuLu, or `nettop` will
-show the same.
+That should return `openrouter.ai` URLs under `/api/v1` (the API base, the
+endpoints from the table above, and the `/api/v1/model` prefix of the per-model
+metadata URL), the `http://localhost:11434/v1` and `http://localhost:1234/v1`
+examples shown in the local-endpoint settings, and
+`https://github.com/notime2/Typer-on-macos`, which is the value of the
+`HTTP-Referer` header, not a host the app contacts. Nothing else. Every other
+address comes from the base URL you type in `Settings -> API`. Watching the app
+with Little Snitch, LuLu, or `nettop` will show the same.
