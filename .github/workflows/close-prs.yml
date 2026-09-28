@@ -1,0 +1,52 @@
+name: Close pull requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    # Only close pull requests opened from a fork. Outside contributors have no
+    # push access and must fork, so this catches them - while branches pushed
+    # directly to this repository by the author are left alone.
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              "Thanks for taking the time to write this.",
+              "",
+              "Typer On does not accept pull requests. It is developed by a single",
+              "author who sets its direction, and every PR is closed automatically",
+              "without review. This is the project's operating model - it is not a",
+              "judgement of your change.",
+              "",
+              "If this addresses a real bug, please open an [issue](https://github.com/notime2/Typer-on-macos/issues)",
+              "describing the problem. Bug reports are read and are genuinely useful.",
+              "",
+              "If you want this change for yourself, fork the project. The Apache-2.0",
+              "license allows it - keep the `NOTICE` attribution, mark the files you",
+              "changed, and rename your fork.",
+              "",
+              "See [CONTRIBUTING.md](https://github.com/notime2/Typer-on-macos/blob/main/CONTRIBUTING.md)."
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              state: "closed",
+            });

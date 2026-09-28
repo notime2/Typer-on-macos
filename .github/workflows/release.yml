@@ -1,0 +1,92 @@
+name: Release
+
+# Builds the ad-hoc signed DMG and attaches it to the GitHub release
+# v<MARKETING_VERSION>. Push that tag, or run the workflow manually: a manual
+# run tags the selected commit itself. With "publish" off, a manual run only
+# uploads the DMG as a workflow artifact, so the build can be checked without
+# creating a release.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the DMG to a GitHub release
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    name: Build DMG
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          version=$(grep -m1 'MARKETING_VERSION' TyperOn/project.yml | sed -E 's/.*"(.*)".*/\1/')
+          tag="v$version"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "$tag" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match MARKETING_VERSION $version in TyperOn/project.yml (expected $tag)."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -switch /Applications/Xcode_26.6.app
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build DMG
+        run: ./TyperOn/script/make_dmg.sh
+
+      - name: Checksum
+        working-directory: TyperOn/build
+        run: shasum -a 256 "TyperOn-${{ steps.version.outputs.version }}.dmg" | tee "TyperOn-${{ steps.version.outputs.version }}.dmg.sha256"
+
+      - name: Upload artifact
+        if: github.event_name == 'workflow_dispatch' && !inputs.publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: TyperOn-${{ steps.version.outputs.version }}
+          path: TyperOn/build/TyperOn-${{ steps.version.outputs.version }}.dmg*
+
+      - name: Publish release
+        if: github.event_name == 'push' || inputs.publish
+        working-directory: TyperOn/build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          files=("TyperOn-$VERSION.dmg" "TyperOn-$VERSION.dmg.sha256")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Typer On $VERSION" \
+              --notes "Download \`TyperOn-$VERSION.dmg\`, open it and drag **Typer On** into **Applications**.
+
+          This build is ad-hoc signed and **not notarized**, so macOS blocks the first launch. After copying the app, run once:
+
+          \`\`\`bash
+          xattr -dr com.apple.quarantine \"/Applications/Typer On.app\"
+          \`\`\`
+
+          Requires macOS Tahoe 26 or later. The SHA-256 checksum is in \`TyperOn-$VERSION.dmg.sha256\`. See the [README](https://github.com/$GITHUB_REPOSITORY#quick-install) for setup."
+          fi

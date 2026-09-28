@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -switch /Applications/Xcode_26.6.app
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: TyperOn
+        run: xcodegen generate
+
+      - name: Test
+        working-directory: TyperOn
+        run: |
+          xcodebuild \
+            -project TyperOn.xcodeproj \
+            -scheme TyperOn \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            test

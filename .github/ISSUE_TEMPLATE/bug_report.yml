@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in Typer On does not work as described.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Typer On interacts with other applications through the Accessibility
+        API, so the **source application matters enormously**. A bug in Telegram
+        is often a different bug from the same symptom in Safari. Please be
+        specific.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Select text in ...
+        2. Press ...
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: source-app
+    attributes:
+      label: Source application
+      description: The app you selected text in, with its version if you know it.
+      placeholder: "Telegram 11.2, Safari 18.1, VS Code 1.95, ..."
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.6 Sonoma, 15.2 Sequoia, ..."
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Typer On version
+      description: From the release you downloaded, or the commit you built.
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Relevant if the problem involves AI output, streaming, or images.
+      placeholder: "google/gemini-3.1-flash-lite-preview"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output
+      description: >
+        Optional. Filter Console.app by the `com.typeron.app` subsystem.
+        Capture logging is metadata-only and does not contain your text, but
+        review anything you paste before posting it.
+      render: text
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I understand this project does not accept pull requests, and that a fix is not guaranteed.
+          required: true

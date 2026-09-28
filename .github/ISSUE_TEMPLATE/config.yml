@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/notime2/Typer-on-macos/security/advisories/new
+    about: Report privately. Do not open a public issue for security problems.
+  - name: Contribution policy
+    url: https://github.com/notime2/Typer-on-macos/blob/main/CONTRIBUTING.md
+    about: This project does not accept pull requests. Read why before opening one.

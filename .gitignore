@@ -1,0 +1,22 @@
+.DS_Store
+*.swp
+
+# Build output
+build/
+DerivedData/
+*.profraw
+*.dmg
+*.app
+*.zip
+
+# Xcode user state
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Local secrets
+.env
