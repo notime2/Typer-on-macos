@@ -1,9 +1,10 @@
 # Typer On
 
-A native macOS menu-bar and float AI writing assistant. Select text in any app, choose
-an action from a floating toolbar, and review or replace the result without
-switching to a browser. A separate Chat Mode supports conversations, questions
-about a screenshot, and image output with compatible models.
+A native macOS menu-bar and floating-toolbar AI writing assistant. Select text
+in any app, choose an action from a floating toolbar, and review or replace the
+result without switching to a browser. A separate Chat Mode supports
+conversations, questions about a screenshot, and image output with compatible
+models.
 
 ![Typer On: AI writing help in any Mac app. 8 modules plus your own, 16 languages, any model including a local one, free and open source.](docs/media/features.jpg)
 
@@ -14,9 +15,26 @@ server you run yourself, such as Ollama or LM Studio. There is no Typer On
 account or subscription: OpenRouter bills its model usage directly, and a local
 server costs nothing to call.
 
+[![Release](https://img.shields.io/github/v/release/notime2/Typer-on-macos)](https://github.com/notime2/Typer-on-macos/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
+
+## Why Typer On
+
+- **Works where you write.** Any app that exposes selected text through macOS
+  Accessibility: mail, notes, chats, browsers, editors. Review the result first,
+  or let a module replace the selection directly.
+- **Any model.** Hundreds of models through OpenRouter with your own key, or a
+  local model through Ollama or LM Studio, so nothing goes to a hosted provider.
+- **Your own actions.** Edit every built-in prompt, add custom modules, and set
+  a model and output language per module.
+- **Open source, no account, no subscription.** Apache-2.0. You pay only your
+  model provider, or nothing with a local server.
+
+Apple Writing Tools, Grammarly, Kerlig and Pismo cover the same
+select-and-rewrite idea. Typer On is the open-source one: you choose the model,
+including a local one, and every module's prompt is yours to read and edit.
 
 ## Quick install
 
@@ -481,10 +499,14 @@ workloads, not network latency, model quality, or cross-application compatibilit
 
 ## Contributions
 
-The project does not accept outside pull requests; see
-[CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature ideas can be filed as
-[issues](https://github.com/notime2/Typer-on-macos/issues). Report security problems
-privately as described in [SECURITY.md](SECURITY.md), not in public issues.
+Typer On is a single-author project and does not accept pull requests: they are
+closed automatically, as [CONTRIBUTING.md](CONTRIBUTING.md) explains. Issues are
+welcome and read. File
+[bug reports and feature ideas](https://github.com/notime2/Typer-on-macos/issues/new/choose)
+through the issue templates, and ask questions or share setups in
+[Discussions](https://github.com/notime2/Typer-on-macos/discussions). Report
+security problems privately as described in [SECURITY.md](SECURITY.md), not in
+public issues.
 
 ## License
 

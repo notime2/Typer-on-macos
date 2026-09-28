@@ -1,0 +1,27 @@
+name: Feature idea
+description: Suggest something Typer On should do. There is no guarantee it will be built.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do, and where Typer On gets in the way. Name the source application if it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: How you imagine it working. Optional.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions for this idea.
+          required: true
+        - label: I understand this project does not accept pull requests, and that an idea may not be built.
+          required: true
