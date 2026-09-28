@@ -45,8 +45,8 @@ brew install --cask notime2/tap/typer-on
 ```
 
 The cask verifies the DMG's SHA-256 checksum and clears the quarantine flag for
-you, so continue from step 4 below. Update later with
-`brew upgrade --cask typer-on`.
+you, so continue from step 4 below. After that the app keeps itself up to date;
+see [Updates](#updates).
 
 Or install the DMG by hand:
 
@@ -67,13 +67,33 @@ Or install the DMG by hand:
 
 Requires macOS Tahoe 26 or later on Apple Silicon. Each release also lists the DMG's SHA-256
 checksum. Clear the quarantine flag only for a DMG downloaded from this
-repository's releases page. After installing a new version, macOS may ask for
-Accessibility access again. To build the app yourself, see
+repository's releases page. To build the app yourself, see
 [Installation from source](#installation-from-source).
 
-**Development status:** the project is configured as version `0.2.0`. Release
-DMGs are built by GitHub Actions and, like local builds, are ad-hoc signed, not
-notarized production releases. Automatic updates are not implemented. Compatibility depends on the source
+### Updates
+
+Typer On updates itself with [Sparkle](https://sparkle-project.org). On the
+second launch it asks whether to check for updates automatically; you can also
+choose **Check for Updates...** in the menu bar at any time, and change both
+automatic checking and automatic installation in **Settings -> General**.
+Updates come from this repository's releases, are verified with an EdDSA
+signature, and keep your settings.
+
+Releases from `0.3.0` on are signed with the same self-signed identity, so an
+update keeps its Accessibility access and should keep its access to the API
+keys in your Keychain. Moving from `0.2.0` or earlier to `0.3.0` needs two
+one-time steps, because earlier builds were ad-hoc signed:
+
+- **Accessibility.** The existing **Typer On** entry in **System Settings ->
+  Privacy & Security -> Accessibility** still looks enabled but no longer
+  applies. Remove it with **-**, then add `/Applications/Typer On.app` again
+  with **+** and switch it on.
+- **Keychain.** macOS asks for your login keychain password once per saved API
+  key. Choose **Always Allow**.
+
+**Development status:** the project is configured as version `0.3.0`. Release
+DMGs are built by GitHub Actions and signed with the project's self-signed
+identity; local builds are ad-hoc signed. Neither is notarized. Compatibility depends on the source
 app's Accessibility support; the presence of a capture profile or automated
 test does not establish complete real-world compatibility.
 
@@ -191,7 +211,8 @@ keep their standard appearance.
 
 The menu bar provides Settings, capture, Chat, the chat history, pause/resume
 auto-detection, enabled-module quick actions, model selection, API-key or local
-endpoint and Accessibility status, and **Reopen Onboarding**. The global
+endpoint and Accessibility status, **Reopen Onboarding**, and **Check for
+Updates...** (it names the new version when a scheduled check found one). The global
 shortcut is configurable; a registration conflict keeps the previous shortcut
 active.
 
@@ -315,9 +336,13 @@ Published releases come from the same script.
 [`.github/workflows/release.yml`](.github/workflows/release.yml) runs it on a
 macOS runner when a `v<version>` tag is pushed (the tag must match
 `MARKETING_VERSION` in `TyperOn/project.yml`), or when the workflow is started
-manually, and attaches the DMG and its SHA-256 checksum to the release.
+manually, and attaches the DMG, its SHA-256 checksum, and the Sparkle
+`appcast.xml` to the release. The workflow signs with the identity stored in
+the repository secrets; set `TYPERON_CODESIGN_IDENTITY` (and optionally
+`TYPERON_CODESIGN_KEYCHAIN`) to sign a local build the same way. Without it the
+script keeps ad-hoc signing, and macOS then treats every build as a new app.
 
-**These builds are ad-hoc signed and not notarized.** macOS may block a downloaded
+**These builds are not notarized.** macOS may block a downloaded
 copy. A warning is not proof that a download is safe or merely missing
 notarization. Only for a build whose source and integrity you trust, you can
 remove quarantine from that specific installed app:
@@ -332,7 +357,7 @@ This bypasses quarantine protection; it does not verify the app's integrity.
 
 | Section | Controls |
 |---------|----------|
-| General | Launch at login, auto-detection, default language (follows the system language until set), interface theme, global shortcut, and Accessibility status |
+| General | Launch at login, auto-detection, default language (follows the system language until set), interface theme, global shortcut, Accessibility status, and automatic update checks and installation |
 | API | Provider choice (OpenRouter or OpenAI-compatible local), the key or base URL for it, searchable model catalog, temperature, and maximum output tokens |
 | Modules | Enabled modules and order, per-module key/model, output-language mode, prompt overrides, and optional automatic replacement |
 | Custom Modules | Create and edit custom prompt modules |
@@ -400,7 +425,9 @@ request are made independently of text generation:
   conversation with a screenshot is sent or retried.
 
 Both carry at most the API key (metadata also has the model ID in its URL) and
-never your selected text, prompts, or screenshots. The current network implementation
+never your selected text, prompts, or screenshots. Update checks, once you
+allow them, go to `github.com`; see [Updates](#updates) and
+[PRIVACY.md](PRIVACY.md#update-checks). The current network implementation
 is in
 [AIEndpointService](TyperOn/Sources/AI/AIEndpointService.swift) and
 [ModelCatalogService](TyperOn/Sources/AI/ModelCatalogService.swift).
@@ -424,7 +451,9 @@ data-handling notes.
 
 The app uses SwiftUI for views and AppKit for windows, the floating panel, and
 the status item. Accessibility, clipboard, hotkeys, Keychain, and screenshots
-use Apple system frameworks. There are no third-party runtime dependencies.
+use Apple system frameworks. The only third-party runtime dependency is
+[Sparkle](https://sparkle-project.org) for updates, resolved by Swift Package
+Manager.
 The app is not sandboxed; Hardened Runtime is enabled in the build configuration.
 
 ```text

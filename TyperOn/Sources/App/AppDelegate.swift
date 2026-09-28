@@ -35,6 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator = AppCoordinator(environment: environment)
         coordinator?.start()
 
+        if !environment.isStreamReplay {
+            environment.appUpdater = AppUpdater()
+        }
+
         onboardingController = OnboardingWindowController(environment: environment)
         statusBarController = StatusBarController(
             environment: environment,

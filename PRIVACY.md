@@ -7,14 +7,17 @@ to your data. Everything below is verifiable in this repository.
 ## Short version
 
 - Typer On has no backend. There is no Typer On server, account, or login.
-- The only host the app ever contacts is `openrouter.ai` with your own API key,
-  or, if you select the OpenAI-compatible provider, the endpoint you configured
-  yourself.
+- For AI requests, the only host the app contacts is `openrouter.ai` with your
+  own API key, or, if you select the OpenAI-compatible provider, the endpoint
+  you configured yourself.
 - Your text and screenshots are sent only when you explicitly run a module or
   send a chat message. The app also fetches the model list and model metadata
   in the background; those requests carry at most your API key and no text.
-- There is no telemetry, no analytics, no crash reporting, and no third-party
-  SDK of any kind.
+- Update checks go to `github.com`, only after you allow them, and send nothing
+  but the app and framework versions. See [Update checks](#update-checks).
+- There is no telemetry, no analytics, and no crash reporting. The only
+  third-party code is the open-source [Sparkle](https://sparkle-project.org)
+  update framework.
 
 ## What leaves your Mac
 
@@ -66,7 +69,29 @@ on-device and never make a network request, and no text leaves your Mac until
 you run a module or send a chat message. The app is not network-idle before
 that, though: the model-list and model-metadata requests described above run
 in the background at launch, after configuration changes, and in Chat Mode.
-They carry at most your API key (and, for metadata, the model ID).
+They carry at most your API key (and, for metadata, the model ID). Update
+checks, once you allow them, are described next.
+
+## Update checks
+
+Typer On updates itself with [Sparkle](https://sparkle-project.org). It does
+not check for updates until you agree: on the second launch Sparkle asks
+whether to check automatically. After that:
+
+| Request | When | What is sent |
+|---------|------|--------------|
+| `GET https://github.com/notime2/Typer-on-macos/releases/latest/download/appcast.xml` | Once a day if automatic checks are on, and whenever you choose **Check for Updates...** in the menu bar | Nothing but a `User-Agent` with the Typer On and Sparkle versions |
+| The DMG of a newer release on `github.com` | Only when an update is installed | The same `User-Agent` |
+
+GitHub redirects both downloads to its release-asset host. Sparkle's optional
+system profile (macOS version, CPU, and similar) is not enabled, so no hardware
+or system details are sent. Your text, keys, and settings are never part of an
+update request. Each update is verified with an EdDSA signature and must carry
+the same code signature as the installed app before Sparkle installs it.
+
+Turn off **Automatically check for updates** or **Automatically download and
+install updates** in **Settings -> General** at any time. The diagnostic
+`--qa-stream-replay` mode never checks for updates.
 
 ## What stays on your Mac
 
@@ -135,7 +160,10 @@ a clipboard history.
 
 Typer On is not sandboxed (`ENABLE_APP_SANDBOX: NO`). The Accessibility APIs it
 depends on are unavailable to sandboxed applications, so this is a technical
-requirement rather than a choice. Hardened Runtime is enabled.
+requirement rather than a choice. Hardened Runtime is enabled with library
+validation turned off: release builds are signed with a self-signed identity
+that has no Apple Team ID, and library validation would otherwise refuse to
+load the embedded Sparkle framework.
 
 ## Verifying this yourself
 
@@ -151,6 +179,8 @@ endpoints from the table above, and the `/api/v1/model` prefix of the per-model
 metadata URL), the `http://localhost:11434/v1` and `http://localhost:1234/v1`
 examples shown in the local-endpoint settings, and
 `https://github.com/notime2/Typer-on-macos`, which is the value of the
-`HTTP-Referer` header, not a host the app contacts. Nothing else. Every other
-address comes from the base URL you type in `Settings -> API`. Watching the app
-with Little Snitch, LuLu, or `nettop` will show the same.
+`HTTP-Referer` header, not a host the app contacts. Nothing else. The update
+feed is the `SUFeedURL` value in `TyperOn/project.yml`, and every other address
+comes from the base URL you type in `Settings -> API`. Watching the app with
+Little Snitch, LuLu, or `nettop` will show the same, plus `github.com` for
+update checks.

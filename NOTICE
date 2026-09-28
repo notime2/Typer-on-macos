@@ -11,6 +11,11 @@ If you redistribute Typer On or a derivative work of it, in source or
 binary form, you must include a readable copy of this NOTICE file, as
 required by Section 4(d) of the Apache License, Version 2.0.
 
+Typer On bundles Sparkle (https://sparkle-project.org), copyright the
+Sparkle Project contributors, under the MIT License. Its full license text
+ships inside the app as Contents/Resources/Sparkle-LICENSE.txt and in the
+source as TyperOn/Resources/Sparkle-LICENSE.txt.
+
 "Typer On" is the product name used by the original author. Section 6 of
 the License does not grant permission to use that name, or the author's
 name, to endorse or promote derivative works. Please rename your fork.

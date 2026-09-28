@@ -33,5 +33,9 @@
 	<string>Copyright 2026 Maksim Nikolaev. Licensed under the Apache License, Version 2.0.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Typer On uses screen capture only when you choose an area, window, or display to attach to Chat Mode.</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/notime2/Typer-on-macos/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>rJgmmyB9a1x+OzqzXim2iWJ/Ck6eNpj+r+XGS6ZAFlk=</string>
 </dict>
 </plist>

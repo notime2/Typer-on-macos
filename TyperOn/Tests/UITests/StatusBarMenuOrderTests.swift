@@ -61,6 +61,24 @@ func testStatusBarMenuKeepsOneSettingsEntryAndTrailingItemOrder() throws {
 
 @Test
 @MainActor
+func testStatusBarMenuPlacesDisabledUpdateCheckBetweenOnboardingAndQuitWithoutAnUpdater() throws {
+    let environment = AppEnvironment()
+    #expect(environment.appUpdater == nil)
+    let controller = makeStatusBarController(environment: environment)
+    let menu = try #require(controller.statusMenuForTesting())
+
+    let titles = menu.items.map(\.title)
+    let onboardingIndex = try #require(titles.firstIndex(of: "Reopen Onboarding"))
+    let updateItem = menu.items[onboardingIndex + 1]
+    #expect(updateItem.title == "Check for Updates...")
+    #expect(updateItem.isEnabled == false)
+    #expect(updateItem.action == nil)
+    #expect(menu.items[onboardingIndex + 2].isSeparatorItem)
+    #expect(menu.items[onboardingIndex + 3].title == "Quit")
+}
+
+@Test
+@MainActor
 func testStatusBarMenuRebuildKeepsSettingsAtTheTop() throws {
     let controller = makeStatusBarController(environment: AppEnvironment())
     let menu = try #require(controller.statusMenuForTesting())

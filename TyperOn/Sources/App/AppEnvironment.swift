@@ -34,6 +34,9 @@ final class AppEnvironment {
 
     var isStreamReplay: Bool { streamReplayService != nil }
 
+    /// Set by `AppDelegate` for a normal launch only; nil under XCTest and stream replay.
+    var appUpdater: AppUpdater?
+
     var requestAIService: (any AIService)? {
         if let streamReplayService { return streamReplayService }
         return aiService

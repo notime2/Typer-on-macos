@@ -1,10 +1,16 @@
 name: Release
 
-# Builds the ad-hoc signed DMG and attaches it to the GitHub release
+# Builds the DMG signed with the project's stable self-signed identity, plus the
+# EdDSA-signed Sparkle appcast.xml, and attaches both to the GitHub release
 # v<MARKETING_VERSION>. Push that tag, or run the workflow manually: a manual
 # run tags the selected commit itself. With "publish" off, a manual run only
-# uploads the DMG as a workflow artifact, so the build can be checked without
+# uploads the files as a workflow artifact, so the build can be checked without
 # creating a release.
+#
+# Required repository secrets:
+#   TYPERON_CODESIGN_P12           base64 of the signing identity (.p12)
+#   TYPERON_CODESIGN_P12_PASSWORD  password of that .p12
+#   SPARKLE_ED_PRIVATE_KEY         Sparkle EdDSA private key (base64)
 
 on:
   push:
@@ -51,6 +57,34 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
+      - name: Import signing identity
+        env:
+          TYPERON_CODESIGN_P12: ${{ secrets.TYPERON_CODESIGN_P12 }}
+          TYPERON_CODESIGN_P12_PASSWORD: ${{ secrets.TYPERON_CODESIGN_P12_PASSWORD }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          # An unsigned or differently signed release would drop every user's
+          # Accessibility grant and fail Sparkle's update check, so never fall back.
+          for name in TYPERON_CODESIGN_P12 TYPERON_CODESIGN_P12_PASSWORD SPARKLE_ED_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Repository secret $name is not set."
+              exit 1
+            fi
+          done
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(openssl rand -base64 24)
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$TYPERON_CODESIGN_P12" | base64 --decode > "$RUNNER_TEMP/codesign.p12"
+          security import "$RUNNER_TEMP/codesign.p12" -k "$keychain" \
+            -P "$TYPERON_CODESIGN_P12_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/codesign.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$keychain_password" "$keychain" > /dev/null
+          echo "TYPERON_CODESIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "TYPERON_CODESIGN_IDENTITY=Typer On Release Signing" >> "$GITHUB_ENV"
+
       - name: Build DMG
         run: ./TyperOn/script/make_dmg.sh
 
@@ -58,12 +92,32 @@ jobs:
         working-directory: TyperOn/build
         run: shasum -a 256 "TyperOn-${{ steps.version.outputs.version }}.dmg" | tee "TyperOn-${{ steps.version.outputs.version }}.dmg.sha256"
 
+      - name: Generate appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # Sparkle's tools come with the package make_dmg.sh resolved into its DerivedData.
+          tools=/tmp/TyperOnRelease/SourcePackages/artifacts/sparkle/Sparkle/bin
+          feed="$RUNNER_TEMP/appcast"
+          mkdir -p "$feed"
+          cp "TyperOn/build/TyperOn-$VERSION.dmg" "$feed/"
+          echo "$SPARKLE_ED_PRIVATE_KEY" | "$tools/generate_appcast" --ed-key-file - \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
+            --full-release-notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
+            --link "https://github.com/$GITHUB_REPOSITORY" \
+            "$feed"
+          cp "$feed/appcast.xml" TyperOn/build/appcast.xml
+
       - name: Upload artifact
         if: github.event_name == 'workflow_dispatch' && !inputs.publish
         uses: actions/upload-artifact@v4
         with:
           name: TyperOn-${{ steps.version.outputs.version }}
-          path: TyperOn/build/TyperOn-${{ steps.version.outputs.version }}.dmg*
+          path: |
+            TyperOn/build/TyperOn-${{ steps.version.outputs.version }}.dmg*
+            TyperOn/build/appcast.xml
 
       - name: Publish release
         if: github.event_name == 'push' || inputs.publish
@@ -73,7 +127,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          files=("TyperOn-$VERSION.dmg" "TyperOn-$VERSION.dmg.sha256")
+          files=("TyperOn-$VERSION.dmg" "TyperOn-$VERSION.dmg.sha256" appcast.xml)
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
           else
@@ -82,11 +136,18 @@ jobs:
               --title "Typer On $VERSION" \
               --notes "Download \`TyperOn-$VERSION.dmg\`, open it and drag **Typer On** into **Applications**.
 
-          This build is ad-hoc signed and **not notarized**, so macOS blocks the first launch. After copying the app, run once:
+          This build is **not notarized**, so macOS blocks the first launch. After copying the app, run once:
 
           \`\`\`bash
           xattr -dr com.apple.quarantine \"/Applications/Typer On.app\"
           \`\`\`
 
-          Requires macOS Tahoe 26 or later. The SHA-256 checksum is in \`TyperOn-$VERSION.dmg.sha256\`. See the [README](https://github.com/$GITHUB_REPOSITORY#quick-install) for setup."
+          Later versions arrive through **Check for Updates...** in the menu bar. Requires macOS Tahoe 26 or later on Apple Silicon. The SHA-256 checksum is in \`TyperOn-$VERSION.dmg.sha256\`. See the [README](https://github.com/$GITHUB_REPOSITORY#quick-install) for setup."
+          fi
+
+      - name: Delete signing keychain
+        if: always()
+        run: |
+          if [[ -n "${TYPERON_CODESIGN_KEYCHAIN:-}" ]]; then
+            security delete-keychain "$TYPERON_CODESIGN_KEYCHAIN"
           fi

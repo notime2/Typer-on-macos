@@ -14,6 +14,8 @@ struct GeneralSettingsView: View {
     @State private var currentCombo: KeyCombo
     @State private var hotkeyErrorMessage: String?
     @State private var permissionController: AccessibilityPermissionStatusController
+    @State private var checksForUpdates: Bool
+    @State private var installsUpdates: Bool
 
     init(
         environment: AppEnvironment
@@ -25,6 +27,9 @@ struct GeneralSettingsView: View {
         _defaultLanguage = State(initialValue: UserDefaults.standard.defaultTargetLanguage)
         let savedCombo = KeyCombo.load() ?? KeyCombo.defaultGlobalHotkey
         _currentCombo = State(initialValue: savedCombo)
+        let updater = environment.appUpdater?.updater
+        _checksForUpdates = State(initialValue: updater?.automaticallyChecksForUpdates ?? false)
+        _installsUpdates = State(initialValue: updater?.automaticallyDownloadsUpdates ?? false)
         _permissionController = State(initialValue: AccessibilityPermissionStatusController(
             permissionChecker: {
                 environment.accessibilityManager.checkPermission()
@@ -195,6 +200,29 @@ struct GeneralSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(.red)
                     }
+                }
+            }
+
+            if let updater = environment.appUpdater?.updater {
+                Divider().foregroundStyle(DS.Colors.separator)
+
+                sectionHeader("Updates")
+
+                settingRow("Automatically check for updates", description: "Look for a new version on GitHub once a day") {
+                    Toggle("", isOn: $checksForUpdates)
+                        .toggleStyle(.switch)
+                        .onChange(of: checksForUpdates) { _, newValue in
+                            updater.automaticallyChecksForUpdates = newValue
+                        }
+                }
+
+                settingRow("Automatically download and install updates", description: "Install a new version in the background; it takes effect on the next launch") {
+                    Toggle("", isOn: $installsUpdates)
+                        .toggleStyle(.switch)
+                        .disabled(!checksForUpdates)
+                        .onChange(of: installsUpdates) { _, newValue in
+                            updater.automaticallyDownloadsUpdates = newValue
+                        }
                 }
             }
         }

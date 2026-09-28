@@ -6,6 +6,9 @@
     <false/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <false/>
+    <!-- A self-signed identity has no Team ID, so library validation would reject the embedded Sparkle.framework. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
     <key>com.apple.security.hardened-runtime</key>
     <true/>
     <key>com.apple.security.network.client</key>

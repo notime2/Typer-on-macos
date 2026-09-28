@@ -190,6 +190,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         onboardingItem.target = self
         menu.addItem(onboardingItem)
 
+        let updater = environment.appUpdater
+        let updateTitle = updater?.pendingUpdateVersion.map { "Update Available (\($0))..." } ?? "Check for Updates..."
+        let updateItem = NSMenuItem(title: updateTitle, action: nil, keyEquivalent: "")
+        if let updater, updater.updater.canCheckForUpdates {
+            updateItem.action = #selector(checkForUpdates)
+            updateItem.target = self
+        } else {
+            updateItem.isEnabled = false
+        }
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
@@ -307,6 +318,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func checkAccessibility() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func checkForUpdates() {
+        environment.appUpdater?.checkForUpdates()
     }
 
     @objc private func quit() {
