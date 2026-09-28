@@ -81,7 +81,7 @@ signature, and keep your settings.
 
 Releases from `0.3.0` on are signed with the same self-signed identity, so an
 update keeps its Accessibility access and should keep its access to the API
-keys in your Keychain. Moving from `0.2.0` or earlier to `0.3.0` needs two
+keys in your Keychain. Moving from `0.2.0` or earlier to `0.3.0` or later needs two
 one-time steps, because earlier builds were ad-hoc signed:
 
 - **Accessibility.** The existing **Typer On** entry in **System Settings ->
@@ -91,7 +91,7 @@ one-time steps, because earlier builds were ad-hoc signed:
 - **Keychain.** macOS asks for your login keychain password once per saved API
   key. Choose **Always Allow**.
 
-**Development status:** the project is configured as version `0.3.0`. Release
+**Development status:** the project is configured as version `0.3.1`. Release
 DMGs are built by GitHub Actions and signed with the project's self-signed
 identity; local builds are ad-hoc signed. Neither is notarized. Compatibility depends on the source
 app's Accessibility support; the presence of a capture profile or automated
