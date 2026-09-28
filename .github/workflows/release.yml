@@ -82,6 +82,10 @@ jobs:
           rm "$RUNNER_TEMP/codesign.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "$keychain_password" "$keychain" > /dev/null
+          # codesign resolves the identity's certificate chain only from keychains
+          # on the user search list, even with --keychain.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -p codesigning "$keychain"
           echo "TYPERON_CODESIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
           echo "TYPERON_CODESIGN_IDENTITY=Typer On Release Signing" >> "$GITHUB_ENV"
 
