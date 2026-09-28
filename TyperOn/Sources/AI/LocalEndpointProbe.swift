@@ -95,9 +95,7 @@ enum AIEndpointRequest {
         if !apiKey.isEmpty {
             request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
-        if endpoint.sendsOpenRouterHeaders {
-            request.addValue("Typer On", forHTTPHeaderField: "X-Title")
-        }
+        endpoint.addAttributionHeaders(to: &request)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw failure(for: endpoint, statusCode: nil)

@@ -64,6 +64,7 @@ struct LocalEndpointCatalogTests {
         #expect(request.url?.absoluteString == "http://localhost:11434/v1/models")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "X-Title") == nil)
+        #expect(request.value(forHTTPHeaderField: "HTTP-Referer") == nil)
     }
 
     @Test
@@ -91,6 +92,7 @@ struct LocalEndpointCatalogTests {
         #expect(request.url?.absoluteString == "https://openrouter.ai/api/v1/models")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer openrouter-key")
         #expect(request.value(forHTTPHeaderField: "X-Title") == "Typer On")
+        #expect(request.value(forHTTPHeaderField: "HTTP-Referer") == "https://github.com/notime2/Typer-on-macos")
         #expect(fixture.defaults.data(for: .cachedModelList) != nil)
         #expect(fixture.defaults.data(for: .cachedLocalModelList) == nil)
     }

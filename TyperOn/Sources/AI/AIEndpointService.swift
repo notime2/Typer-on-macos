@@ -173,9 +173,7 @@ final class AIEndpointService: AIService, @unchecked Sendable {
             urlRequest.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
         urlRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        if endpoint.sendsOpenRouterHeaders {
-            urlRequest.addValue("Typer On", forHTTPHeaderField: "X-Title")
-        }
+        endpoint.addAttributionHeaders(to: &urlRequest)
         urlRequest.httpBody = try JSONEncoder().encode(request)
 
         return urlRequest
@@ -203,7 +201,7 @@ final class AIEndpointService: AIService, @unchecked Sendable {
         urlRequest.httpMethod = "POST"
         urlRequest.addValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.addValue("Typer On", forHTTPHeaderField: "X-Title")
+        endpoint.addAttributionHeaders(to: &urlRequest)
         urlRequest.httpBody = try JSONEncoder().encode(resolvedRequest)
         return urlRequest
     }

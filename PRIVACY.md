@@ -24,15 +24,17 @@ three endpoints, all on `openrouter.ai`:
 | `POST /api/v1/images` | You send a chat message to a model with image output | The prompt and the latest session screenshot as an input reference |
 | `GET /api/v1/models` | Settings opens the model catalog | Nothing but your key, to authorize the request |
 
-Every request carries your OpenRouter API key as a `Bearer` token and an
-`X-Title: Typer On` header, which is how OpenRouter attributes traffic to an
-application. No other identifier is attached.
+Every request carries your OpenRouter API key as a `Bearer` token and two
+attribution headers, `X-Title: Typer On` and
+`HTTP-Referer: https://github.com/notime2/Typer-on-macos`, which is how
+OpenRouter attributes traffic to an application. Both values are the same for
+every install. No other identifier is attached.
 
 If you switch the provider in `Settings -> API` to **OpenAI-compatible (local)**,
 `openrouter.ai` is not contacted at all. Requests go to the base URL you entered
 and nowhere else: `POST {base URL}/chat/completions` when you run a module or
 send a chat message, and `GET {base URL}/models` for the model list and for
-**Test Connection**. No `X-Title` header is sent, an `Authorization: Bearer`
+**Test Connection**. No OpenRouter attribution headers are sent, an `Authorization: Bearer`
 header is added only if you saved a key for that endpoint, and the OpenRouter
 Images API is never used. Plain `http` is accepted only for local and
 private-network addresses.

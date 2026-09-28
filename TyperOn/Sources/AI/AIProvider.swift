@@ -157,6 +157,14 @@ struct AIEndpointConfiguration: Sendable, Equatable, Hashable {
     var sendsOpenRouterHeaders: Bool { provider == .openRouter }
     var requiresAPIKey: Bool { provider == .openRouter }
 
+    /// OpenRouter app attribution. `HTTP-Referer` creates the public app page and ranking entry,
+    /// `X-Title` names it. Both are fixed for every install; local endpoints get neither.
+    func addAttributionHeaders(to request: inout URLRequest) {
+        guard sendsOpenRouterHeaders else { return }
+        request.addValue("https://github.com/notime2/Typer-on-macos", forHTTPHeaderField: "HTTP-Referer")
+        request.addValue("Typer On", forHTTPHeaderField: "X-Title")
+    }
+
     /// Host and port as shown in settings, the status bar, and module inheritance hints.
     var displayHost: String {
         guard let components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false),

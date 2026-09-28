@@ -31,6 +31,7 @@ struct LocalEndpointRequestBuildingTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer openrouter-key")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         #expect(request.value(forHTTPHeaderField: "X-Title") == "Typer On")
+        #expect(request.value(forHTTPHeaderField: "HTTP-Referer") == "https://github.com/notime2/Typer-on-macos")
     }
 
     @Test
@@ -50,6 +51,7 @@ struct LocalEndpointRequestBuildingTests {
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "X-Title") == nil)
+        #expect(request.value(forHTTPHeaderField: "HTTP-Referer") == nil)
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
 
         let body = try #require(request.httpBody)

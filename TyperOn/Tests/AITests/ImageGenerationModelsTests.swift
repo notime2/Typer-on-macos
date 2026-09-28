@@ -65,6 +65,8 @@ func testImagesURLRequestUsesResolvedModelAndImagesEndpoint() throws {
     #expect(urlRequest.url?.absoluteString == "https://openrouter.ai/api/v1/images")
     #expect(urlRequest.httpMethod == "POST")
     #expect(urlRequest.value(forHTTPHeaderField: "Authorization") == "Bearer resolved-key")
+    #expect(urlRequest.value(forHTTPHeaderField: "X-Title") == "Typer On")
+    #expect(urlRequest.value(forHTTPHeaderField: "HTTP-Referer") == "https://github.com/notime2/Typer-on-macos")
     #expect(decodedRequest.model == "resolved/image-model")
     #expect(decodedRequest.prompt == "Generate an icon")
     #expect(decodedRequest.inputReferences == request.inputReferences)
