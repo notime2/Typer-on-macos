@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import SwiftUI
@@ -264,7 +264,7 @@ final class ProcessingViewModel {
         resetCopyFeedback()
 
         guard let aiService = aiServiceProvider() else {
-            error = "AI service not configured. Open Settings (Cmd+,) to add your API key."
+            error = "AI service not configured. Choose and connect a provider in Settings -> API \\ Models."
             isErrorRetryable = false
             if processingMode == .automaticReplacement {
                 onAutomaticProcessingEvent?(.requiresPresentation)
@@ -351,7 +351,7 @@ final class ProcessingViewModel {
                 if processingMode == .automaticReplacement {
                     onAutomaticProcessingEvent?(.requiresPresentation)
                 }
-                Log.ai.error("AI request failed: \(error)")
+                Log.ai.error("AI request failed")
             }
         }
     }

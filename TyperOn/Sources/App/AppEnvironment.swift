@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import AppKit
@@ -31,6 +31,8 @@ final class AppEnvironment {
     private let userDefaults: UserDefaults
     private let catalogSession: URLSession
     private let streamReplayService: StreamReplayService?
+    @ObservationIgnored private var bootstrapID = UUID()
+    @ObservationIgnored private var catalogBootstrapTask: Task<Void, Never>?
 
     var isStreamReplay: Bool { streamReplayService != nil }
 
@@ -53,11 +55,13 @@ final class AppEnvironment {
         streamReplayFixture: StreamReplayFixture? = nil,
         userDefaults: UserDefaults = .standard,
         catalogSession: URLSession = .shared,
-        chatHistoryStore: ChatHistoryStore? = nil
+        chatHistoryStore: ChatHistoryStore? = nil,
+        keychainAccessOverrides: KeychainAccessOverrides? = nil
     ) {
         self.userDefaults = userDefaults
         self.catalogSession = catalogSession
-        self.keychainService = KeychainService(allowsSystemAccess: streamReplayFixture == nil)
+        self.keychainService = KeychainService(allowsSystemAccess: streamReplayFixture == nil,
+                                               accessOverrides: keychainAccessOverrides)
         self.streamReplayService = streamReplayFixture.map { StreamReplayService(fixture: $0) }
         self.moduleRegistry = ModuleRegistry(userDefaults: userDefaults)
         // Replay runs on synthetic text and never writes the real history.
@@ -77,20 +81,27 @@ final class AppEnvironment {
     }
 
     func bootstrap() {
+        let bootstrapID = UUID()
+        self.bootstrapID = bootstrapID
         let providerSettings = self.providerSettings
         let apiKey = globalAPIKey(for: providerSettings.provider)
         let model = userDefaults.globalModelID(for: providerSettings.provider)
         let temperature = userDefaults.double(for: .temperature)
         let maxTokens = userDefaults.integer(for: .maxTokens)
 
-        aiService = (isStreamReplay ? nil : providerSettings.endpoint).map { endpoint in
-            AIEndpointService(
-                endpoint: endpoint,
-                apiKey: apiKey,
-                defaultModel: model,
-                defaultTemperature: temperature > 0 ? temperature : AIModelDefaults.defaultTemperature,
-                defaultMaxTokens: maxTokens > 0 ? maxTokens : AIModelDefaults.defaultMaxTokens
-            )
+        if !isStreamReplay, providerSettings.provider.isSubscription {
+            aiService = SubscriptionAIService(provider: providerSettings.provider,
+                                              executablePath: providerSettings.subscriptionExecutablePath)
+        } else {
+            aiService = (isStreamReplay ? nil : providerSettings.endpoint).map { endpoint in
+                AIEndpointService(
+                    endpoint: endpoint,
+                    apiKey: apiKey,
+                    defaultModel: model,
+                    defaultTemperature: temperature > 0 ? temperature : AIModelDefaults.defaultTemperature,
+                    defaultMaxTokens: maxTokens > 0 ? maxTokens : AIModelDefaults.defaultMaxTokens
+                )
+            }
         }
 
         if textReplacer == nil {
@@ -119,17 +130,27 @@ final class AppEnvironment {
 
         let catalogSource = providerSettings.catalogSource
         modelCatalog.setSource(catalogSource)
-        let canFetchCatalog = catalogSource.endpoint.map { !$0.requiresAPIKey || !apiKey.isEmpty } ?? false
+        let canFetchCatalog = providerSettings.provider.isSubscription
+            || (catalogSource.endpoint.map { !$0.requiresAPIKey || !apiKey.isEmpty } ?? false)
 
-        Task {
+        catalogBootstrapTask?.cancel()
+        catalogBootstrapTask = Task {
+            guard self.bootstrapID == bootstrapID, modelCatalog.source == catalogSource else { return }
             await modelCatalog.loadCached()
-            if !isStreamReplay, canFetchCatalog {
-                await modelCatalog.fetchModels(apiKey: apiKey)
+            if self.bootstrapID == bootstrapID, modelCatalog.source == catalogSource,
+               !isStreamReplay, canFetchCatalog {
+                await modelCatalog.fetchModels(apiKey: apiKey, source: catalogSource)
             }
         }
 
         Log.app.info("AppEnvironment bootstrapped with provider \(providerSettings.provider.rawValue, privacy: .public)")
     }
+
+#if DEBUG
+    func waitForCatalogBootstrapForTesting() async {
+        await catalogBootstrapTask?.value
+    }
+#endif
 
     /// A separate catalog for an unsaved settings draft, so a draft endpoint never re-points the shared one.
     func makeDraftModelCatalog() -> ModelCatalogService {
@@ -147,6 +168,8 @@ final class AppEnvironment {
             return keychainService.getGlobalAPIKey() ?? ""
         case .openAICompatible:
             return keychainService.getLocalEndpointAPIKey() ?? ""
+        case .codex, .claudeCode:
+            return ""
         }
     }
 
@@ -179,7 +202,7 @@ final class AppEnvironment {
         if let config = moduleAIConfig(for: module.id),
            !config.useGlobal {
             return ResolvedAIConfig(
-                apiKey: config.usesModuleAPIKey && !isStreamReplay
+                apiKey: config.usesModuleAPIKey && !isStreamReplay && !providerSettings.provider.isSubscription
                     ? (keychainService.getModuleAPIKey(moduleId: module.id) ?? globalKey)
                     : globalKey,
                 model: config.customModel ?? globalModel,

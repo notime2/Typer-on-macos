@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Synthetic optimized diagnostic adapter, deliberately outside the app target.
 import AppKit
 import Darwin

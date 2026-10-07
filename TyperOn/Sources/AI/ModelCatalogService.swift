@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import Foundation
@@ -17,6 +17,7 @@ final class ModelCatalogService {
     private(set) var isLoading = false
     private(set) var error: String?
     private(set) var source: ModelCatalogSource = .openRouter
+    private(set) var subscriptionConnectionResult: SubscriptionConnectionResult?
     private var resolvedModelsByID: [String: OpenRouterModel] = [:]
     private var modelResolutionIDs: [String: UUID] = [:]
     private var modelsByID: [String: OpenRouterModel] = [:]
@@ -34,6 +35,11 @@ final class ModelCatalogService {
     private struct LocalCatalogCache: Codable, Sendable {
         let endpoint: String
         let modelIDs: [String]
+    }
+
+    private struct SubscriptionCatalogCache: Codable, Sendable {
+        let executablePath: String?
+        let models: [OpenRouterModel]
     }
 
     private struct RefreshKey: Hashable {
@@ -98,6 +104,7 @@ final class ModelCatalogService {
         cacheLoad = nil
         latestRefreshID = nil
         error = nil
+        subscriptionConnectionResult = nil
     }
 
     private static let defaultGroups = Dictionary(grouping: defaultModels, by: \.providerName)
@@ -121,8 +128,11 @@ final class ModelCatalogService {
 
     func fetchModels(apiKey: String, source requestedSource: ModelCatalogSource? = nil) async {
         if let requestedSource { setSource(requestedSource) }
-        guard allowsRemoteRequests, let endpoint = source.endpoint else { return }
-        guard !endpoint.requiresAPIKey || !apiKey.isEmpty else { return }
+        guard allowsRemoteRequests else { return }
+        if !source.provider.isSubscription {
+            guard let endpoint = source.endpoint,
+                  !endpoint.requiresAPIKey || !apiKey.isEmpty else { return }
+        }
 
         let activeSource = source
         let refreshKey = RefreshKey(source: activeSource, apiKey: apiKey)
@@ -142,9 +152,23 @@ final class ModelCatalogService {
                 isLoading = !refreshes.isEmpty
             }
             do {
-                let data = try await AIEndpointRequest.data(
-                    url: endpoint.modelsURL, endpoint: endpoint, apiKey: apiKey, session: session
-                )
+                let data: Data
+                if case .subscription(let provider, let executablePath) = activeSource {
+                    let result = await SubscriptionCLI.checkConnection(provider: provider, executablePath: executablePath)
+                    guard latestRefreshID == refreshID, source == activeSource else { return }
+                    subscriptionConnectionResult = result
+                    guard result.isReady else {
+                        error = result.message
+                        await loadCached()
+                        return
+                    }
+                    data = try JSONEncoder().encode(SubscriptionCatalogCache(executablePath: executablePath, models: result.models))
+                } else {
+                    guard let endpoint = activeSource.endpoint else { return }
+                    data = try await AIEndpointRequest.data(
+                        url: endpoint.modelsURL, endpoint: endpoint, apiKey: apiKey, session: session
+                    )
+                }
                 let prepared = try await Task.detached { try Self.prepare(data, source: activeSource) }.value
                 guard latestRefreshID == refreshID, source == activeSource else { return }
                 error = nil
@@ -193,6 +217,11 @@ final class ModelCatalogService {
             return data
         case .unconfigured:
             return nil
+        case .subscription(let provider, let executablePath):
+            guard let data = userDefaults.data(for: provider == .codex ? .cachedCodexModels : .cachedClaudeModels),
+                  let cache = try? JSONDecoder().decode(SubscriptionCatalogCache.self, from: data),
+                  cache.executablePath == executablePath else { return nil }
+            return data
         }
     }
 
@@ -206,6 +235,8 @@ final class ModelCatalogService {
             userDefaults.set(encoded, for: .cachedLocalModelList)
         case .unconfigured:
             return
+        case .subscription(let provider, _):
+            userDefaults.set(data, for: provider == .codex ? .cachedCodexModels : .cachedClaudeModels)
         }
     }
 
@@ -230,6 +261,13 @@ final class ModelCatalogService {
             return prepareLocal(modelIDs)
         case .unconfigured:
             throw AIEndpointRequestError.invalidResponse
+        case .subscription(let provider, _):
+            let models = try JSONDecoder().decode(SubscriptionCatalogCache.self, from: data).models
+            return PreparedCatalog(
+                models: models,
+                byID: Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+                groups: models.isEmpty ? [] : [(provider: provider.displayName, models: models)]
+            )
         }
     }
 

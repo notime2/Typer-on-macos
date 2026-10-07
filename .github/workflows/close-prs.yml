@@ -30,9 +30,10 @@ jobs:
               "If this addresses a real bug, please open an [issue](https://github.com/notime2/Typer-on-macos/issues)",
               "describing the problem. Bug reports are read and are genuinely useful.",
               "",
-              "If you want this change for yourself, fork the project. The Apache-2.0",
-              "license allows it - keep the `NOTICE` attribution, mark the files you",
-              "changed, and rename your fork.",
+              "Individuals may fork under the [Typer On Individual Use License 1.0](https://github.com/notime2/Typer-on-macos/blob/main/LICENSE).",
+              "Keep the license and `NOTICE` attribution, mark changes, and rename derivatives.",
+              "Use by or on behalf of an organization requires a separate written license;",
+              "contact [Maksim Nikolaev](https://github.com/notime2).",
               "",
               "See [CONTRIBUTING.md](https://github.com/notime2/Typer-on-macos/blob/main/CONTRIBUTING.md)."
             ].join("\n");

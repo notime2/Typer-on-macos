@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import Foundation
@@ -22,7 +22,7 @@ enum LocalEndpointProbeResult: Equatable, Sendable {
     }
 }
 
-/// `Test Connection` in Settings -> API: one `GET {baseURL}/models` that never writes settings or Keychain.
+/// `Test Connection` in Settings -> API \ Models: one `GET {baseURL}/models` that never writes settings or Keychain.
 struct LocalEndpointProbe: Sendable {
     private let session: URLSession
 
@@ -115,6 +115,8 @@ enum AIEndpointRequest {
         case .openAICompatible:
             guard let statusCode else { return AIEndpointRequestError.invalidResponse }
             return AIEndpointRequestError.httpStatus(statusCode)
+        case .codex, .claudeCode:
+            return AIEndpointRequestError.invalidResponse
         }
     }
 }

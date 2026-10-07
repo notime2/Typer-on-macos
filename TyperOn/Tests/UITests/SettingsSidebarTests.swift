@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import CoreGraphics
@@ -17,7 +17,7 @@ func testSettingsSidebarListsEveryTabInDeclaredOrder() {
 func testSettingsSidebarRowsCarryTabTitleAndSymbol() {
     let items = SettingsSidebarItem.all
 
-    #expect(items.map(\.title) == ["General", "API", "Modules", "Custom Modules", "Chat History"])
+    #expect(items.map(\.title) == ["General", "API \\ Models", "Modules", "Custom Modules", "Chat History"])
     #expect(items.map(\.systemImage) == ["gear", "key", "square.stack.3d.up", "text.bubble", "clock.arrow.circlepath"])
 }
 

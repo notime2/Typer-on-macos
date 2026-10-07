@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import SwiftUI
@@ -258,6 +258,8 @@ private struct ModuleRow: View {
     @State private var modelDraft = ModuleModelDraft()
     @AppStorage(SettingsKey.selectedModel.rawValue) private var globalModel = AIModelDefaults.defaultModelID
     @AppStorage(SettingsKey.localSelectedModel.rawValue) private var localGlobalModel = ""
+    @AppStorage(SettingsKey.codexSelectedModel.rawValue) private var codexGlobalModel = ""
+    @AppStorage(SettingsKey.claudeSelectedModel.rawValue) private var claudeGlobalModel = ""
     @AppStorage(SettingsKey.aiProvider.rawValue) private var globalProviderRawValue = AIProvider.fallback.rawValue
     @State private var customApiKey = ""
     @State private var hasStoredModuleAPIKey = false
@@ -280,8 +282,25 @@ private struct ModuleRow: View {
         )
     }
 
+    /// A subscription CLI signs in with one shared account, so a module has no key of its own there.
+    private var usesSubscriptionProvider: Bool {
+        providerSettings.provider.isSubscription
+    }
+
     private var effectiveGlobalModel: String {
-        providerSettings.provider == .openRouter ? globalModel : localGlobalModel
+        switch providerSettings.provider {
+        case .openRouter:
+            return globalModel
+        case .openAICompatible:
+            return localGlobalModel
+        case .codex:
+            return codexGlobalModel
+        case .claudeCode:
+            // An unset model resolves through the shared default instead of a second copy of it here.
+            return claudeGlobalModel.isEmpty
+                ? UserDefaults.standard.globalModelID(for: .claudeCode)
+                : claudeGlobalModel
+        }
     }
 
     var body: some View {
@@ -331,35 +350,16 @@ private struct ModuleRow: View {
 
                     if !useGlobal {
                         VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                SecureField(hasStoredModuleAPIKey ? "Leave blank to keep saved module key" : "Custom API Key (optional)", text: $customApiKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 13))
-                                    .focused($focusedField, equals: .customAPIKey)
-
-                                HStack(spacing: DS.Spacing.sm) {
-                                    Label(
-                                        hasStoredModuleAPIKey
-                                            ? "Module API key saved in Keychain"
-                                            : ModuleProviderHint.credentialLabel(
-                                                provider: providerSettings.provider,
-                                                host: providerSettings.endpoint?.displayHost
-                                            ),
-                                        systemImage: hasStoredModuleAPIKey ? "checkmark.circle.fill" : "globe"
-                                    )
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(hasStoredModuleAPIKey ? .green : DS.Colors.textTertiary)
-
-                                    Spacer()
-
-                                    if hasStoredModuleAPIKey {
-                                        Button("Clear Saved Key") {
-                                            clearStoredModuleAPIKey()
-                                        }
-                                        .font(.system(size: 12))
-                                        .buttonStyle(.glass)
-                                    }
-                                }
+                            if usesSubscriptionProvider {
+                                Label(
+                                    ModuleProviderHint.credentialLabel(provider: providerSettings.provider, host: nil),
+                                    systemImage: "person.crop.circle"
+                                )
+                                .font(.system(size: 12))
+                                .foregroundStyle(DS.Colors.textTertiary)
+                                .help("Module API keys apply to OpenRouter and local endpoints only. Saved keys are kept.")
+                            } else {
+                                moduleAPIKeySection
                             }
 
                             ModelPickerView(
@@ -475,12 +475,47 @@ private struct ModuleRow: View {
         }
     }
 
+    private var moduleAPIKeySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SecureField(hasStoredModuleAPIKey ? "Leave blank to keep saved module key" : "Custom API Key (optional)", text: $customApiKey)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 13))
+                .focused($focusedField, equals: .customAPIKey)
+
+            HStack(spacing: DS.Spacing.sm) {
+                Label(
+                    hasStoredModuleAPIKey
+                        ? "Module API key saved in Keychain"
+                        : ModuleProviderHint.credentialLabel(
+                            provider: providerSettings.provider,
+                            host: providerSettings.endpoint?.displayHost
+                        ),
+                    systemImage: hasStoredModuleAPIKey ? "checkmark.circle.fill" : "globe"
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(hasStoredModuleAPIKey ? .green : DS.Colors.textTertiary)
+
+                Spacer()
+
+                if hasStoredModuleAPIKey {
+                    Button("Clear Saved Key") {
+                        clearStoredModuleAPIKey()
+                    }
+                    .font(.system(size: 12))
+                    .buttonStyle(.glass)
+                }
+            }
+        }
+    }
+
     private func loadModuleConfig() {
         let loadedConfig = currentConfig()
         useGlobal = loadedConfig?.useGlobal ?? true
         modelDraft = ModuleModelDraft(customModel: loadedConfig?.customModel)
         customApiKey = ""
-        hasStoredModuleAPIKey = environment.keychainService.getModuleAPIKey(moduleId: module.id)?.isEmpty == false
+        // A CLI provider ignores module keys, so its settings never read the Keychain.
+        hasStoredModuleAPIKey = !usesSubscriptionProvider
+            && environment.keychainService.getModuleAPIKey(moduleId: module.id)?.isEmpty == false
         outputLanguageMode = loadedConfig?.resolvedOutputLanguageMode(for: module.id)
             ?? ModuleOutputLanguageMode.defaultMode(for: module.id)
         autoReplaceOriginalText = loadedConfig?.autoReplaceOriginalText ?? false
@@ -518,7 +553,10 @@ private struct ModuleRow: View {
 
         configs[module.id] = ModuleAIConfig(
             useGlobal: useGlobal,
-            usesModuleAPIKey: hasStoredModuleAPIKey,
+            // The key state was not read under a CLI provider; keep it for the HTTP providers.
+            usesModuleAPIKey: usesSubscriptionProvider
+                ? (existingConfig?.usesModuleAPIKey ?? false)
+                : hasStoredModuleAPIKey,
             customModel: modelDraft.customModel,
             customTemperature: existingConfig?.customTemperature,
             customMaxTokens: existingConfig?.customMaxTokens,
@@ -542,7 +580,8 @@ private struct ModuleRow: View {
     }
 
     private var catalogAPIKey: String {
-        guard !environment.isStreamReplay else { return "" }
+        // A CLI catalog refreshes through the signed-in account and must not read any saved key.
+        guard !environment.isStreamReplay, !usesSubscriptionProvider else { return "" }
         return ModuleModelDraft.catalogAPIKey(
             enteredKey: customApiKey,
             storedModuleKey: environment.keychainService.getModuleAPIKey(moduleId: module.id),

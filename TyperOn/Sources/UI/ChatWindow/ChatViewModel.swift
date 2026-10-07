@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import AppKit
@@ -486,7 +486,7 @@ final class ChatViewModel {
         stopStreaming()
 
         guard let aiService = aiServiceProvider() else {
-            error = "AI service not configured. Open Settings (Cmd+,) to add your API key."
+            error = "AI service not configured. Choose and connect a provider in Settings -> API \\ Models."
             isErrorRetryable = false
             return
         }
@@ -556,7 +556,7 @@ final class ChatViewModel {
                 self.isErrorRetryable = (error as? AIError)?.isRetryable ?? true
                 self.streamingText.finish()
                 self.endResponse()
-                Log.ai.error("Chat AI request failed: \(error)")
+                Log.ai.error("Chat AI request failed")
             }
         }
     }
@@ -565,7 +565,7 @@ final class ChatViewModel {
         stopStreaming()
 
         guard let aiService = aiServiceProvider() else {
-            error = "AI service not configured. Open Settings (Cmd+,) to add your API key."
+            error = "AI service not configured. Choose and connect a provider in Settings -> API \\ Models."
             isErrorRetryable = false
             return
         }
@@ -619,7 +619,7 @@ final class ChatViewModel {
                 self.error = error.localizedDescription
                 self.isErrorRetryable = (error as? AIError)?.isRetryable ?? true
                 self.endResponse()
-                Log.ai.error("Chat image request failed: \(error)")
+                Log.ai.error("Chat image request failed")
             }
         }
     }

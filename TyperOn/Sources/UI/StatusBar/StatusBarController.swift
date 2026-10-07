@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import AppKit
@@ -112,8 +112,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // Model selection submenu
         let providerSettings = environment.providerSettings
         let currentModel = UserDefaults.standard.activeGlobalModelID
+        // A subscription CLI runs its own default model until one is chosen.
         let modelDisplayName = currentModel.isEmpty
-            ? "Not selected"
+            ? (providerSettings.provider.isSubscription ? "Default" : "Not selected")
             : environment.modelCatalog.displayName(for: currentModel)
         let modelItem = NSMenuItem(title: "Model: \(modelDisplayName)", action: nil, keyEquivalent: "")
         let modelSubmenu = NSMenu()
@@ -168,6 +169,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 ?? "Local Endpoint: Not Configured"
             apiItem = NSMenuItem(title: title, action: #selector(showModelSettings), keyEquivalent: "")
             apiItem.target = self
+        } else if providerSettings.provider.isSubscription {
+            // A CLI provider has no API key. The row shows what the saved catalog's last check
+            // found; building the menu never launches the CLI or reads the Keychain.
+            let state = SubscriptionConnectionState(catalog: environment.modelCatalog)
+            apiItem = NSMenuItem(
+                title: "\(providerSettings.provider.displayName): \(state.label)",
+                action: #selector(showModelSettings),
+                keyEquivalent: ""
+            )
+            apiItem.target = self
+            apiItem.toolTip = environment.modelCatalog.subscriptionConnectionResult?.message
         } else {
             let hasKey = globalAPIKeyProvider()?.isEmpty == false
             let apiTitle = hasKey ? "API Key: Configured" : "Set API Key..."

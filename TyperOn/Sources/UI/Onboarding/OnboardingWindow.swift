@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import AppKit
@@ -79,6 +79,37 @@ struct OnboardingView: View {
         UserDefaults.standard.aiProviderSettings
     }
 
+    private var providerRowTitle: String {
+        switch providerSettings.provider {
+        case .openRouter:
+            return "Add OpenRouter API Key"
+        case .openAICompatible:
+            return "Configure Local Endpoint"
+        case .codex, .claudeCode:
+            return "Connect \(providerSettings.provider.displayName)"
+        }
+    }
+
+    /// A CLI provider has no API key: its row reports what the saved catalog's check found.
+    private var providerRowDescription: String {
+        switch providerSettings.provider {
+        case .openRouter:
+            return "Open Settings -> API \\ Models and save a valid key. Typer On uses your own key and model selection."
+        case .openAICompatible:
+            return "Open Settings -> API \\ Models and save the base URL of your OpenAI-compatible server, then pick a model."
+        case .codex, .claudeCode:
+            switch SubscriptionConnectionState(catalog: environment.modelCatalog) {
+            case .checking:
+                return "Checking the installed CLI and its subscription sign-in..."
+            case .notChecked:
+                return "Open Settings -> API \\ Models, check the connection and save. No API key is needed."
+            case .ready, .executableMissing, .connectionFailed:
+                return environment.modelCatalog.subscriptionConnectionResult?.message
+                    ?? "Open Settings -> API \\ Models and check the connection."
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.xl) {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
@@ -104,18 +135,14 @@ struct OnboardingView: View {
                 )
 
                 checklistRow(
-                    icon: "key",
-                    title: providerSettings.provider == .openRouter
-                        ? "Add OpenRouter API Key"
-                        : "Configure Local Endpoint",
-                    description: providerSettings.provider == .openRouter
-                        ? "Open Settings -> API and save a valid key. Typer On uses your own key and model selection."
-                        : "Open Settings -> API and save the base URL of your OpenAI-compatible server, then pick a model.",
+                    icon: providerSettings.provider.isSubscription ? "person.crop.circle" : "key",
+                    title: providerRowTitle,
+                    description: providerRowDescription,
                     isComplete: hasAPIKey,
-                    actionTitle: "Open API Settings",
+                    actionTitle: "Open API \\ Models",
                     secondaryActionTitle: "Refresh",
                     action: onOpenAPISettings,
-                    secondaryAction: refreshStatus
+                    secondaryAction: refreshProviderStatus
                 )
 
                 checklistRow(
@@ -150,6 +177,10 @@ struct OnboardingView: View {
             refreshStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshStatus()
+        }
+        // The CLI check finishes on its own schedule; complete the row as soon as it reports.
+        .onChange(of: environment.modelCatalog.subscriptionConnectionResult?.isReady) { _, _ in
             refreshStatus()
         }
         .padding(.horizontal, DS.Spacing.xxl)
@@ -228,8 +259,20 @@ struct OnboardingView: View {
         let settings = providerSettings
         hasAPIKey = AIProviderReadiness.isConfigured(
             provider: settings.provider,
-            hasOpenRouterKey: environment.keychainService.getGlobalAPIKey()?.isEmpty == false,
-            localBaseURL: settings.localBaseURL
+            // Only OpenRouter needs its key; the other providers must not read the Keychain here.
+            hasOpenRouterKey: settings.provider == .openRouter
+                && environment.keychainService.getGlobalAPIKey()?.isEmpty == false,
+            localBaseURL: settings.localBaseURL,
+            subscriptionIsReady: environment.modelCatalog.subscriptionConnectionResult?.isReady == true
         )
+    }
+
+    /// `Refresh` on the provider row also re-runs the saved CLI check, so a sign-in finished in
+    /// Terminal is picked up. The check is asynchronous and the row follows its result.
+    private func refreshProviderStatus() {
+        refreshStatus()
+        guard providerSettings.provider.isSubscription,
+              environment.modelCatalog.source.provider == providerSettings.provider else { return }
+        Task { await environment.modelCatalog.fetchModels(apiKey: "") }
     }
 }

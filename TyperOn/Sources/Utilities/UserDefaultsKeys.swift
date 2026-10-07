@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import Foundation
@@ -12,6 +12,12 @@ enum SettingsKey: String {
     case aiProvider
     case localEndpointBaseURL
     case localSelectedModel
+    case codexSelectedModel
+    case claudeSelectedModel
+    case codexExecutablePath
+    case claudeExecutablePath
+    case cachedCodexModels
+    case cachedClaudeModels
     case maxTokens
     case temperature
     case enabledModuleIDs
@@ -104,7 +110,8 @@ extension UserDefaults {
     var aiProviderSettings: AIProviderSettings {
         AIProviderSettings.resolve(
             provider: string(for: .aiProvider),
-            localBaseURL: string(for: .localEndpointBaseURL)
+            localBaseURL: string(for: .localEndpointBaseURL),
+            subscriptionExecutablePath: subscriptionExecutablePath(for: AIProvider.resolve(rawValue: string(for: .aiProvider)))
         )
     }
 
@@ -127,6 +134,10 @@ extension UserDefaults {
             return string(for: .selectedModel) ?? AIModelDefaults.defaultModelID
         case .openAICompatible:
             return string(for: .localSelectedModel) ?? ""
+        case .codex:
+            return string(for: .codexSelectedModel) ?? ""
+        case .claudeCode:
+            return string(for: .claudeSelectedModel) ?? "sonnet"
         }
     }
 
@@ -136,10 +147,31 @@ extension UserDefaults {
             set(modelID, for: .selectedModel)
         case .openAICompatible:
             set(modelID, for: .localSelectedModel)
+        case .codex:
+            set(modelID, for: .codexSelectedModel)
+        case .claudeCode:
+            set(modelID, for: .claudeSelectedModel)
         }
     }
 
     func setActiveGlobalModelID(_ modelID: String) {
         setGlobalModelID(modelID, for: aiProviderSettings.provider)
+    }
+
+    func subscriptionExecutablePath(for provider: AIProvider) -> String? {
+        switch provider {
+        case .codex: string(for: .codexExecutablePath)
+        case .claudeCode: string(for: .claudeExecutablePath)
+        case .openRouter, .openAICompatible: nil
+        }
+    }
+
+    func setSubscriptionExecutablePath(_ path: String?, for provider: AIProvider) {
+        let path = path?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch provider {
+        case .codex: set(path?.isEmpty == false ? path : nil, for: .codexExecutablePath)
+        case .claudeCode: set(path?.isEmpty == false ? path : nil, for: .claudeExecutablePath)
+        case .openRouter, .openAICompatible: break
+        }
     }
 }

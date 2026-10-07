@@ -4,18 +4,20 @@ Copyright 2026 Maksim Nikolaev
 This product includes software developed by
 Maksim Nikolaev (https://github.com/notime2).
 
-Licensed under the Apache License, Version 2.0.
-See the LICENSE file for the full license text.
+Licensed under the Typer On Individual Use License 1.0
+(SPDX: LicenseRef-Typer-On-Individual-1.0).
+Individual use is free of charge. Use by or on behalf of an organization
+requires a separate written license from the copyright holder.
+See LICENSE for definitions, permissions and conditions.
 
-If you redistribute Typer On or a derivative work of it, in source or
-binary form, you must include a readable copy of this NOTICE file, as
-required by Section 4(d) of the Apache License, Version 2.0.
+Redistributions must include LICENSE and a readable copy of this NOTICE,
+preserve attribution and mark modifications. Modified distributions must
+use a different name and must not imply endorsement by the original author.
+
+Earlier copies released under Apache-2.0 retain their original license rights.
 
 Typer On bundles Sparkle (https://sparkle-project.org), copyright the
 Sparkle Project contributors, under the MIT License. Its full license text
 ships inside the app as Contents/Resources/Sparkle-LICENSE.txt and in the
-source as TyperOn/Resources/Sparkle-LICENSE.txt.
-
-"Typer On" is the product name used by the original author. Section 6 of
-the License does not grant permission to use that name, or the author's
-name, to endorse or promote derivative works. Please rename your fork.
+source as TyperOn/Resources/Sparkle-LICENSE.txt. Those third-party license
+rights are unchanged.

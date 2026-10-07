@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import Darwin
@@ -8,6 +8,10 @@ import Foundation
 enum AIProvider: String, Codable, CaseIterable, Sendable {
     case openRouter
     case openAICompatible
+    case codex
+    case claudeCode
+
+    var isSubscription: Bool { self == .codex || self == .claudeCode }
 
     static let fallback: AIProvider = .openRouter
 
@@ -23,6 +27,10 @@ enum AIProvider: String, Codable, CaseIterable, Sendable {
             return "OpenRouter"
         case .openAICompatible:
             return "OpenAI-compatible (local)"
+        case .codex:
+            return "Codex (ChatGPT)"
+        case .claudeCode:
+            return "Claude Code"
         }
     }
 }
@@ -198,6 +206,7 @@ struct AIEndpointConfiguration: Sendable, Equatable, Hashable {
 enum ModelCatalogSource: Equatable, Hashable, Sendable {
     case openRouter
     case openAICompatible(baseURL: URL)
+    case subscription(provider: AIProvider, executablePath: String?)
     /// The local provider is selected but its base URL is missing or invalid.
     case unconfigured
 
@@ -207,6 +216,8 @@ enum ModelCatalogSource: Equatable, Hashable, Sendable {
             return .openRouter
         case .openAICompatible, .unconfigured:
             return .openAICompatible
+        case .subscription(let provider, _):
+            return provider
         }
     }
 
@@ -216,7 +227,7 @@ enum ModelCatalogSource: Equatable, Hashable, Sendable {
             return .openRouter
         case .openAICompatible(let baseURL):
             return .openAICompatible(baseURL: baseURL)
-        case .unconfigured:
+        case .unconfigured, .subscription:
             return nil
         }
     }
@@ -227,14 +238,16 @@ struct AIProviderSettings: Equatable, Sendable {
     let provider: AIProvider
     let localBaseURLText: String
     let localBaseURL: URL?
+    var subscriptionExecutablePath: String? = nil
 
-    static func resolve(provider rawProvider: String?, localBaseURL rawBaseURL: String?) -> AIProviderSettings {
+    static func resolve(provider rawProvider: String?, localBaseURL rawBaseURL: String?, subscriptionExecutablePath: String? = nil) -> AIProviderSettings {
         let provider = AIProvider.resolve(rawValue: rawProvider)
         let text = rawBaseURL ?? ""
         return AIProviderSettings(
             provider: provider,
             localBaseURLText: text,
-            localBaseURL: try? AIEndpointURL.normalize(text)
+            localBaseURL: try? AIEndpointURL.normalize(text),
+            subscriptionExecutablePath: subscriptionExecutablePath
         )
     }
 
@@ -245,6 +258,8 @@ struct AIProviderSettings: Equatable, Sendable {
             return .openRouter
         case .openAICompatible:
             return localBaseURL.map { AIEndpointConfiguration.openAICompatible(baseURL: $0) }
+        case .codex, .claudeCode:
+            return nil
         }
     }
 
@@ -255,18 +270,22 @@ struct AIProviderSettings: Equatable, Sendable {
         case .openAICompatible:
             guard let localBaseURL else { return .unconfigured }
             return .openAICompatible(baseURL: localBaseURL)
+        case .codex, .claudeCode:
+            return .subscription(provider: provider, executablePath: subscriptionExecutablePath)
         }
     }
 }
 
 /// Whether the onboarding API row and the status bar can treat credentials as configured.
 enum AIProviderReadiness {
-    static func isConfigured(provider: AIProvider, hasOpenRouterKey: Bool, localBaseURL: URL?) -> Bool {
+    static func isConfigured(provider: AIProvider, hasOpenRouterKey: Bool, localBaseURL: URL?, subscriptionIsReady: Bool = false) -> Bool {
         switch provider {
         case .openRouter:
             return hasOpenRouterKey
         case .openAICompatible:
             return localBaseURL != nil
+        case .codex, .claudeCode:
+            return subscriptionIsReady
         }
     }
 }
@@ -280,6 +299,8 @@ enum ModuleProviderHint {
         case .openAICompatible:
             guard let host, !host.isEmpty else { return "Using local endpoint (not configured)" }
             return "Using local endpoint (\(host))"
+        case .codex, .claudeCode:
+            return "Using the signed-in \(provider.displayName) account"
         }
     }
 
@@ -290,6 +311,8 @@ enum ModuleProviderHint {
         case .openAICompatible:
             guard let host, !host.isEmpty else { return "Using global model (local endpoint)" }
             return "Using global model (\(host))"
+        case .codex, .claudeCode:
+            return "Using global model (\(provider.displayName))"
         }
     }
 }

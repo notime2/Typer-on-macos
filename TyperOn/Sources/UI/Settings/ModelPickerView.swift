@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import SwiftUI
@@ -10,6 +10,8 @@ struct ModelPickerView: View {
     let apiKey: String
     /// A refresh target for an endpoint being edited; `nil` refreshes whatever source the catalog already shows.
     var source: ModelCatalogSource?
+    /// Off where the host already reports the catalog failure next to its own actions.
+    var showsCatalogError = true
 
     @State private var searchText = ""
     @State private var customModelId = ""
@@ -18,6 +20,11 @@ struct ModelPickerView: View {
 
     private var filteredGroups: [(provider: String, models: [OpenRouterModel])] {
         catalog.groups(matching: searchText)
+    }
+
+    /// A subscription CLI lists its own models and runs its default one until a model is chosen.
+    private var isSubscriptionCatalog: Bool {
+        catalog.source.provider.isSubscription
     }
 
     var body: some View {
@@ -49,7 +56,11 @@ struct ModelPickerView: View {
                 .overlay(RoundedRectangle(cornerRadius: DS.Radius.button).stroke(DS.Colors.separator, lineWidth: 0.5))
 
                 Button {
-                    Task { await catalog.fetchModels(apiKey: apiKey, source: source) }
+                    let activeSource = catalog.source
+                    Task {
+                        guard catalog.source == activeSource else { return }
+                        await catalog.fetchModels(apiKey: apiKey, source: source ?? activeSource)
+                    }
                 } label: {
                     Image(systemName: catalog.isLoading ? "arrow.trianglehead.2.clockwise" : "arrow.trianglehead.2.clockwise")
                         .font(.system(size: 12))
@@ -66,7 +77,11 @@ struct ModelPickerView: View {
                 Text("Selected:")
                     .font(.system(size: 12))
                     .foregroundStyle(DS.Colors.textTertiary)
-                Text(selectedModelId.isEmpty ? "Not selected" : catalog.displayName(for: selectedModelId))
+                Text(
+                    selectedModelId.isEmpty
+                        ? (isSubscriptionCatalog ? "Default" : "Not selected")
+                        : catalog.displayName(for: selectedModelId)
+                )
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(selectedModelId.isEmpty ? DS.Colors.textTertiary : DS.Colors.textPrimary)
                     .lineLimit(1)
@@ -76,7 +91,11 @@ struct ModelPickerView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if filteredGroups.isEmpty {
-                        Text("No models found")
+                        Text(
+                            isSubscriptionCatalog && searchText.isEmpty
+                                ? "No models loaded. Check the connection to list this CLI's models."
+                                : "No models found"
+                        )
                             .font(.system(size: 12))
                             .foregroundStyle(DS.Colors.textTertiary)
                             .frame(maxWidth: .infinity)
@@ -105,7 +124,7 @@ struct ModelPickerView: View {
             // Custom model input
             HStack(spacing: DS.Spacing.sm) {
                 if showCustomInput {
-                    TextField("provider/model-name", text: $customModelId)
+                    TextField(isSubscriptionCatalog ? "Model ID" : "provider/model-name", text: $customModelId)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 13))
                         .onSubmit {
@@ -133,7 +152,7 @@ struct ModelPickerView: View {
                 }
             }
 
-            if let error = catalog.error {
+            if showsCatalogError, let error = catalog.error {
                 Text(error)
                     .font(.system(size: 11))
                     .foregroundStyle(.red)

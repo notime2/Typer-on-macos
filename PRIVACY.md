@@ -7,17 +7,20 @@ to your data. Everything below is verifiable in this repository.
 ## Short version
 
 - Typer On has no backend. There is no Typer On server, account, or login.
-- For AI requests, the only host the app contacts is `openrouter.ai` with your
-  own API key, or, if you select the OpenAI-compatible provider, the endpoint
-  you configured yourself.
+- Direct AI HTTP requests go to `openrouter.ai` with your API key, or to your
+  configured OpenAI-compatible endpoint. If you select Codex or Claude Code,
+  the installed official CLI handles authentication and sends requests to
+  OpenAI or Anthropic services using your subscription.
 - Your text and screenshots are sent only when you explicitly run a module or
   send a chat message. The app also fetches the model list and model metadata
-  in the background; those requests carry at most your API key and no text.
+  in the background, or checks the subscription CLI's account and models;
+  those checks contain no text, prompts, or screenshots.
 - Update checks go to `github.com`, only after you allow them, and send nothing
   but the app and framework versions. See [Update checks](#update-checks).
 - There is no telemetry, no analytics, and no crash reporting. The only
-  third-party code is the open-source [Sparkle](https://sparkle-project.org)
-  update framework.
+  third-party app dependency is the open-source [Sparkle](https://sparkle-project.org)
+  update framework. Codex and Claude Code are separately installed programs
+  with their own network, storage, and diagnostic behavior.
 
 ## What leaves your Mac
 
@@ -28,11 +31,11 @@ four endpoints, all on `openrouter.ai`:
 |----------|------|--------------|
 | `POST /api/v1/chat/completions` | You run a module on selected text, or send a chat message | The system prompt, your text, and any attached screenshot |
 | `POST /api/v1/images` | You send a chat message to a model with image output | The prompt and the latest session screenshot as an input reference |
-| `GET /api/v1/models` | At launch if a global API key is saved; again after you save `Settings -> API`, save or clear the key from the status bar, or pick a model in the status bar `Model` menu; and when you press refresh in a model picker | Nothing but your key, to authorize the request |
+| `GET /api/v1/models` | At launch if a global API key is saved; again after you save `Settings -> API \ Models`, save or clear the key from the status bar, or pick a model in the status bar `Model` menu; and when you press refresh in a model picker | Nothing but your key, to authorize the request |
 | `GET /api/v1/model/{author}/{slug}` | Chat Mode only, when the loaded model list has no complete entry for the Chat model (for example a manually entered model ID, or before the list has loaded): when the Chat window opens, when the model list or AI settings change while it is open, before a screenshot is captured, and before a message or retry is sent in a conversation that contains a screenshot. The result is kept in memory for the session | Your key, plus the model ID in the URL path |
 
 The two `GET` requests have no request body. They never include selected text,
-prompts, chat history, or screenshots. A refresh in `Settings -> API` uses the
+prompts, chat history, or screenshots. A refresh in `Settings -> API \ Models` uses the
 key currently in the key field; a refresh in a module's model picker uses the
 key entered or saved for that module, otherwise the global key. Model metadata
 is requested with the key of the `Chat Mode` module configuration.
@@ -43,7 +46,7 @@ attribution headers, `X-Title: Typer On` and
 OpenRouter attributes traffic to an application. Both values are the same for
 every install. No other identifier is attached.
 
-If you switch the provider in `Settings -> API` to **OpenAI-compatible (local)**,
+If you switch the provider in `Settings -> API \ Models` to **OpenAI-compatible (local)**,
 `openrouter.ai` is not contacted at all. Requests go to the base URL you entered
 and nowhere else: `POST {base URL}/chat/completions` when you run a module or
 send a chat message, and `GET {base URL}/models` for the model list. The model
@@ -57,6 +60,40 @@ header is added only when a key is entered or saved for that endpoint, and the
 OpenRouter Images API is never used. Plain `http` is accepted only for local and
 private-network addresses.
 
+### Codex and Claude Code subscriptions
+
+When Codex or Claude Code is selected, Typer On launches that official CLI
+instead of making an OpenRouter or local-endpoint AI request. The CLI owns
+sign-in and its connections to OpenAI or Anthropic authentication and AI
+services. Those destinations depend on the installed CLI and service
+configuration; the app's HTTP endpoint table does not describe all traffic
+from the child process.
+
+When you run a built-in or custom module, send a chat message, refine a
+response, or request screenshot analysis, Typer On passes the applicable
+system prompt, text history, and attached screenshot to the selected CLI.
+User messages and screenshots use the process's standard input; Claude Code's
+system prompt is a direct process argument. Neither path uses shell interpolation.
+Connection and model-catalog checks pass no user content. Typer On does not
+read, store, or log the CLI's OAuth tokens. Global and module API keys remain
+in Keychain and are not used for subscription requests. Inherited API-key and
+alternate-provider environment variables are removed from child CLI launches
+so subscription requests do not use those API credentials.
+
+The integrations disable agent tools and request responses without access
+to your files or shell. Image generation is unavailable through these CLI
+integrations: the app shows that limitation and suggests choosing OpenRouter
+manually. Errors and unsupported capabilities do not trigger an automatic
+provider switch.
+
+OpenAI's or Anthropic's account terms, usage limits, and data policies apply
+to content sent through their CLIs. Typer On requests a fresh ephemeral Codex
+conversation and disables Claude Code session persistence. Each child runs
+in a private temporary working directory that is removed when it exits;
+Typer On does not write screenshot or request files there. These controls do
+not govern provider retention or all CLI diagnostics. CLI storage and diagnostics
+are separate from Typer On's local history and unified logging described below.
+
 Once your text reaches OpenRouter, it is governed by
 [OpenRouter's privacy policy](https://openrouter.ai/privacy) and by the
 policy of whichever model provider you selected. Typer On has no visibility
@@ -67,9 +104,9 @@ your account.
 Auto-detecting a selection and showing the floating toolbar happen entirely
 on-device and never make a network request, and no text leaves your Mac until
 you run a module or send a chat message. The app is not network-idle before
-that, though: the model-list and model-metadata requests described above run
-in the background at launch, after configuration changes, and in Chat Mode.
-They carry at most your API key (and, for metadata, the model ID). Update
+that, though: the model-list, model-metadata, and subscription connection
+checks described above can run before a prompt is sent. HTTP discovery carries
+at most your API key (and, for metadata, the model ID). Update
 checks, once you allow them, are described next.
 
 ## Update checks
@@ -101,9 +138,13 @@ file, or to logs. Per-module key overrides and the optional key for a local
 endpoint live in the Keychain too - the settings store records only whether an
 override exists.
 
+**Subscription authentication** belongs to the installed Codex or Claude Code
+CLI. Typer On saves its executable path and model choice, not its login
+tokens. Signing in uses the official CLI's authentication flow and storage.
+
 **Settings** are in `UserDefaults` under the app's own domain: hotkey, default
-language, the selected provider and its base URL, the selected model of each
-provider, temperature and max tokens, enabled modules and their order, your
+language, the selected provider, its base URL or CLI executable path, each
+provider's selected model, temperature and max tokens, enabled modules and their order, your
 custom prompts, per-module configuration, cached model catalogs, window
 size, and whether the chat history sidebar is shown. You can inspect them with
 `defaults read com.typeron.app`.
@@ -113,9 +154,9 @@ module on it or use it as Chat context, it becomes part of that conversation in
 the local chat history described below. Selected text that you only capture,
 without running a module or sending a chat message, is not saved.
 
-**Screenshots** captured in Chat Mode exist only as PNG data in memory. They
-are never written to a file, never placed on the clipboard, and are discarded
-when the session resets or the app quits. At most one pending screenshot is
+**Screenshots** captured in Chat Mode exist only as PNG data in Typer On's
+memory. Typer On never writes them to a file or places them on the clipboard;
+they are discarded when the session resets or the app quits. At most one pending screenshot is
 kept.
 
 **Chat history.** Chat Mode conversations and every module run (the selected
@@ -136,6 +177,10 @@ Capture logging is deliberately metadata-only: it records UTF-16 length,
 process ID, bundle identifier, capture confidence, and which accessibility
 evidence source won - never the selected text itself. API keys, request
 bodies, image bytes, and base64 data URLs are not logged.
+
+This describes Typer On's logs, not diagnostics maintained by a separately
+installed Codex or Claude Code CLI. Consult that CLI's settings and policies
+for its own local storage and diagnostic behavior.
 
 ## System permissions
 
@@ -171,16 +216,22 @@ This document describes the code in this repository, and you are encouraged to
 check it rather than take it on faith:
 
 ```bash
-grep -rE 'https?://' TyperOn/Sources --include='*.swift'
+rg -n 'https?://' TyperOn/Sources -g '*.swift'
 ```
 
-That should return `openrouter.ai` URLs under `/api/v1` (the API base, the
+That search shows `openrouter.ai` URLs under `/api/v1` (the API base, the
 endpoints from the table above, and the `/api/v1/model` prefix of the per-model
 metadata URL), the `http://localhost:11434/v1` and `http://localhost:1234/v1`
 examples shown in the local-endpoint settings, and
 `https://github.com/notime2/Typer-on-macos`, which is the value of the
-`HTTP-Referer` header, not a host the app contacts. Nothing else. The update
-feed is the `SUFeedURL` value in `TyperOn/project.yml`, and every other address
-comes from the base URL you type in `Settings -> API`. Watching the app with
-Little Snitch, LuLu, or `nettop` will show the same, plus `github.com` for
-update checks.
+`HTTP-Referer` header, not a host the app contacts. The update feed is the
+`SUFeedURL` value in `TyperOn/project.yml`, and the local AI endpoint comes
+from the base URL you type in `Settings -> API \ Models`.
+Documentation URLs in code comments do not themselves establish network traffic.
+
+That source search cannot enumerate connections opened by Codex or Claude
+Code. Inspect [the subscription transport](TyperOn/Sources/AI/SubscriptionAIService.swift)
+and [CLI setup](TyperOn/Sources/AI/SubscriptionCLI.swift) alongside the HTTP transport,
+and include child processes when watching network activity with Little
+Snitch, LuLu, or `nettop`. Update downloads can also follow GitHub redirects
+to its release-asset host, as described above.

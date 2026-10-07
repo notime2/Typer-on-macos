@@ -10,8 +10,10 @@
   If you found a bug, please open an issue instead:
   https://github.com/notime2/Typer-on-macos/issues
 
-  If you want to take the code somewhere else, fork it. The Apache-2.0
-  license allows that - keep the NOTICE attribution and rename your fork.
+  Individuals may fork under the Typer On Individual Use License 1.0 - keep
+  the license and NOTICE attribution, mark changes, and rename derivatives.
+  Use by or on behalf of an organization requires a separate written license.
+  Contact: https://github.com/notime2
 
   See CONTRIBUTING.md for the full policy.
 -->

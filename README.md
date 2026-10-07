@@ -6,17 +6,14 @@ result without switching to a browser. A separate Chat Mode supports
 conversations, questions about a screenshot, and image output with compatible
 models.
 
-![Typer On: AI writing help in any Mac app. 8 modules plus your own, 16 languages, any model including a local one, free and open source.](docs/media/features.jpg)
-
-[▶ Watch the showreel with sound (MP4, 49 s)](docs/media/showreel.mp4)
-
-Typer On uses your own [OpenRouter](https://openrouter.ai) API key, or a model
-server you run yourself, such as Ollama or LM Studio. There is no Typer On
-account or subscription: OpenRouter bills its model usage directly, and a local
-server costs nothing to call.
+Typer On uses your own [OpenRouter](https://openrouter.ai) API key, a model
+server you run yourself such as Ollama or LM Studio, or your ChatGPT or Claude
+subscription through the installed Codex or Claude Code CLI. There is no Typer
+On account or subscription. Your selected provider's access rules and usage
+limits apply.
 
 [![Release](https://img.shields.io/github/v/release/notime2/Typer-on-macos)](https://github.com/notime2/Typer-on-macos/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Individual%20Use-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey.svg)
 ![Swift](https://img.shields.io/badge/Swift-6-orange.svg)
 
@@ -25,15 +22,17 @@ server costs nothing to call.
 - **Works where you write.** Any app that exposes selected text through macOS
   Accessibility: mail, notes, chats, browsers, editors. Review the result first,
   or let a module replace the selection directly.
-- **Any model.** Hundreds of models through OpenRouter with your own key, or a
-  local model through Ollama or LM Studio, so nothing goes to a hosted provider.
+- **Choose your provider.** OpenRouter with your own key, Codex with your
+  ChatGPT subscription, Claude Code with your Claude subscription, or a local
+  model through Ollama or LM Studio.
 - **Your own actions.** Edit every built-in prompt, add custom modules, and set
   a model and output language per module.
-- **Open source, no account, no subscription.** Apache-2.0. You pay only your
-  model provider, or nothing with a local server.
+- **Free for individuals, source available.** No Typer On account or
+  subscription. Use your model provider's billing or subscription, or a local
+  server. Organizations require a separate written license.
 
 Apple Writing Tools, Grammarly, Kerlig and Pismo cover the same
-select-and-rewrite idea. Typer On is the open-source one: you choose the model,
+select-and-rewrite idea. With Typer On, you choose the model,
 including a local one, and every module's prompt is yours to read and edit.
 
 ## Quick install
@@ -62,8 +61,8 @@ Or install the DMG by hand:
 
 4. Open Typer On from Applications. It lives in the menu bar and has no Dock
    icon.
-5. Grant Accessibility access, then add an OpenRouter key or a local endpoint in
-   **Settings -> API**. See [First launch](#first-launch) for details.
+5. Grant Accessibility access, then choose and configure your provider in
+   **Settings -> API \ Models**. See [First launch](#first-launch) for details.
 
 Requires macOS Tahoe 26 or later on Apple Silicon. Each release also lists the DMG's SHA-256
 checksum. Clear the quarantine flag only for a DMG downloaded from this
@@ -92,7 +91,7 @@ Settings -> Privacy & Security -> Accessibility** still looks enabled but no
 longer applies. Remove it with **-**, then add `/Applications/Typer On.app`
 again with **+** and switch it on.
 
-**Development status:** the project is configured as version `0.3.1`. Release
+**Development status:** the project is configured as version `0.4.0`. Release
 DMGs are built by GitHub Actions and signed with the project's self-signed
 identity; local builds are ad-hoc signed. Neither is notarized. Compatibility depends on the source
 app's Accessibility support; the presence of a capture profile or automated
@@ -140,8 +139,10 @@ into the desired order. This order is shared by the toolbar, its numbered
 shortcuts, and menu bar quick actions.
 
 Each module can inherit global AI settings or use its own API key and
-model. You can edit its system prompt and choose **Default Language** or
-**Source Language** for output. Model selection uses a searchable,
+model. The provider is global: a module's model override uses that selected
+provider. With Codex or Claude Code, API keys are ignored and remain saved for
+when you return to an API provider. You can edit its system prompt and choose
+**Default Language** or **Source Language** for output. Model selection uses a searchable,
 provider-grouped catalog and also accepts a manual model ID. **Use global
 model** removes the model override without clearing a saved module key. Apply
 module edits with **Save Module Settings**.
@@ -190,6 +191,11 @@ Models with declared image output use the OpenRouter Images API; Chat can show
 text, images, or both. Availability and results depend on the selected model
 and provider.
 
+Codex and Claude Code support screenshot analysis with models whose image
+input is known. Image generation is unavailable through these integrations.
+Typer On shows the limitation and suggests selecting OpenRouter in
+**Settings -> API \ Models**; it never switches providers automatically.
+
 Chat conversations and module runs are saved as a local chat history. The
 sidebar button in the Chat and Processing header shows it, **New Chat** starts
 an empty conversation, and the menu bar **Chat History** submenu opens recent
@@ -211,8 +217,8 @@ Dot; the other themes use their own non-glass surfaces. Settings and onboarding
 keep their standard appearance.
 
 The menu bar provides Settings, capture, Chat, the chat history, pause/resume
-auto-detection, enabled-module quick actions, model selection, API-key or local
-endpoint and Accessibility status, **Reopen Onboarding**, and **Check for
+auto-detection, enabled-module quick actions, model selection, provider
+connection and Accessibility status, **Reopen Onboarding**, and **Check for
 Updates...** (it names the new version when a scheduled check found one). The global
 shortcut is configurable; a registration conflict keeps the previous shortcut
 active.
@@ -264,15 +270,17 @@ and other Telegram clients do not inherit it.
 ## Requirements
 
 - A Mac running **macOS Tahoe 26.0 or later**.
-- Either an OpenRouter API key with network access, or a local OpenAI-compatible
-  server such as Ollama or LM Studio. See [Local models](#local-models).
+- An OpenRouter API key, a local OpenAI-compatible server, or the installed
+  Codex or Claude Code CLI authenticated with your subscription. See
+  [Subscription providers](#subscription-providers) and [Local models](#local-models).
 - **Accessibility** permission for selection capture and replacement.
 - Screen-capture permission as required by macOS when using screenshot input.
 - To build: **Xcode 26 or later** with its macOS SDK and **XcodeGen**.
 
-The default AI backend is OpenRouter. `Settings -> API` can switch to any
-OpenAI-compatible endpoint you run yourself. The local replay diagnostic described
-below is neither of those: it is a fixture player, not an inference provider.
+The default AI backend is OpenRouter. `Settings -> API \ Models` switches
+between OpenRouter, a local OpenAI-compatible endpoint, Codex, and Claude Code.
+The local replay diagnostic described below is a fixture player, not an
+inference provider.
 
 ## Installation from source
 
@@ -308,15 +316,19 @@ rather than treating the Swift package executable as the installed GUI app.
 
 1. Grant access in **System Settings -> Privacy & Security -> Accessibility**,
    then return to Typer On or use **Refresh** in its permission status.
-2. In **Settings -> API**, pick a provider. For OpenRouter, save your key and
-   select a model; for a local endpoint, enter its base URL, use **Test
-   Connection**, and select a model. Keys are stored in the macOS Keychain.
+2. In **Settings -> API \ Models**, pick a provider. For OpenRouter, save your
+   key and select a model; for a local endpoint, enter its base URL, use **Test
+   Connection**, and select a model. For Codex or Claude Code, select the
+   installed CLI, sign in with your subscription, and check its connection
+   before saving. API keys are stored in the macOS Keychain; subscription
+   authentication is owned by the official CLI.
 3. Use **Open Chat Window** in onboarding, send a short message, and confirm
    that a response arrives. Then finish onboarding with **Get Started**.
 
 The onboarding checklist checks Accessibility access, whether the active
-provider is configured (a saved OpenRouter key, or a valid local base URL), and
-whether its Open Chat action was used. It does **not** validate the key
+provider is configured (a saved OpenRouter key, a valid local base URL, or an
+authenticated subscription CLI), and whether its Open Chat action was used.
+It does **not** validate the key
 with a successful AI response; the manual message above checks that separately.
 Closing onboarding without completing it causes it to return on the next launch.
 Typer On lives in the menu bar and has no Dock icon.
@@ -359,20 +371,44 @@ This bypasses quarantine protection; it does not verify the app's integrity.
 | Section | Controls |
 |---------|----------|
 | General | Launch at login, auto-detection, default language (follows the system language until set), interface theme, global shortcut, Accessibility status, and automatic update checks and installation |
-| API | Provider choice (OpenRouter or OpenAI-compatible local), the key or base URL for it, searchable model catalog, temperature, and maximum output tokens |
+| API \ Models | OpenRouter, OpenAI-compatible local, Codex, or Claude Code; provider credentials or CLI connection, searchable model catalog, and supported generation settings |
 | Modules | Enabled modules and order, per-module key/model, output-language mode, prompt overrides, and optional automatic replacement |
 | Custom Modules | Create and edit custom prompt modules |
 | Chat History | Saved chats and module runs: read a transcript, delete one chat, or clear everything |
 
 ![Settings, Modules tab: the module list with the Translate row expanded, showing Use global AI settings, Automatically replace original text, the output-language choice, and the editable system prompt, followed by the Rephrase, Summarize, and Explain rows.](docs/media/settings-modules.png)
 
-![Settings, API tab: the provider choice between OpenRouter and OpenAI-compatible (local), the masked API key field, and the searchable model catalog.](docs/media/settings-api.png)
+![Earlier Settings screenshot showing the OpenRouter and local provider options, the masked API key field, and the model catalog; the current tab is API \ Models.](docs/media/settings-api.png)
+
+## Subscription providers
+
+**Codex** uses the official Codex CLI signed in with your ChatGPT account.
+**Claude Code** uses the official Claude Code CLI signed in with your Claude
+account. Install and authenticate the CLI you want to use first, then select
+it in **Settings -> API \ Models**. If the executable is not detected,
+choose its installed path. Check the connection, select a model from that
+CLI's catalog, and save.
+
+The selected subscription provider handles all built-in text modules, custom
+prompts, Chat Mode, refinements, and supported screenshot analysis. Per-module
+model overrides remain available and use the same global provider. Existing
+OpenRouter, local, and module API keys are preserved and do not authorize CLI
+requests. Signing in, subscription eligibility, and usage limits are handled
+by the official CLI and its service.
+
+Codex and Claude Code use their own generation defaults. Typer On's
+temperature and maximum-output-token settings are unavailable for these
+providers; saved API-provider values are preserved.
+
+These integrations request AI responses without granting tools access to your
+files or shell. They do not generate images; choose OpenRouter manually for
+that capability. A failed CLI request, missing login, or unsupported capability
+does not fall back to another provider.
 
 ## Local models
 
-`Settings -> API` has two providers. **OpenRouter** is the default and is
-unchanged. **OpenAI-compatible (local)** points the same Chat Completions
-transport at a server you run, so nothing is sent to a hosted provider.
+In `Settings -> API \ Models`, **OpenAI-compatible (local)** points the same
+Chat Completions transport at a server you run, so nothing is sent to a hosted provider.
 
 Fill in the base URL of that server's OpenAI-compatible API:
 
@@ -411,12 +447,12 @@ Selection detection is local. Selected text and screenshots are sent for AI
 processing when you invoke a processing module or send a chat message, not
 merely because the floating toolbar or a chat window is shown.
 
-**The app is not network-idle until the first prompt.** Two kinds of background
-request are made independently of text generation:
+**The app is not network-idle until the first prompt.** Provider setup and
+model discovery run independently of text generation:
 
-- **Model catalog** (`GET /models` of the active provider): at launch and after
-  you save `Settings -> API`, save or clear the key from the status bar, or pick
-  a model in the status bar `Model` menu, provided an OpenRouter key is saved or
+- **HTTP model catalog** (`GET /models` for OpenRouter or a local endpoint): at launch and after
+  you save `Settings -> API \ Models`, save or clear the key from the status bar,
+  or pick a model in the status bar `Model` menu, provided an OpenRouter key is saved or
   a valid local base URL is configured; also when you press refresh in a model
   picker or run **Test Connection**.
 - **Model metadata** (`GET https://openrouter.ai/api/v1/model/{author}/{slug}`,
@@ -424,14 +460,23 @@ request are made independently of text generation:
   entry for the Chat model: on opening the Chat window, when the catalog or AI
   settings change while it is open, and before a screenshot is captured or a
   conversation with a screenshot is sent or retried.
+- **Subscription CLI connection and catalog:** Codex and Claude Code inspect
+  authentication and available models through their installed CLI. The CLI
+  can contact its service for these checks or when you sign in. These checks
+  do not send selected text, prompts, or screenshots.
 
-Both carry at most the API key (metadata also has the model ID in its URL) and
-never your selected text, prompts, or screenshots. Update checks, once you
+The HTTP catalog and metadata requests carry at most the API key (metadata
+also has the model ID in its URL). Update checks, once you
 allow them, go to `github.com`; see [Updates](#updates) and
 [PRIVACY.md](PRIVACY.md#update-checks). The current network implementation
 is in
 [AIEndpointService](TyperOn/Sources/AI/AIEndpointService.swift) and
 [ModelCatalogService](TyperOn/Sources/AI/ModelCatalogService.swift).
+The [subscription transport](TyperOn/Sources/AI/SubscriptionAIService.swift)
+and [CLI connection code](TyperOn/Sources/AI/SubscriptionCLI.swift) delegate
+inference and authentication to the official CLI. Typer On does not read or
+store its OAuth tokens. Its connections and local diagnostics are subject to
+that CLI's behavior and its provider's policies.
 
 Global and module API keys are kept in Keychain. Preferences, custom prompts,
 module configuration, and the cached model list are stored locally in
@@ -442,10 +487,11 @@ never saved. Capture logs contain
 metadata rather than the selected text. Explicit fallback capture or replacement
 can temporarily use the clipboard; screenshot capture does not use it.
 
-With the local provider, the only host contacted is the endpoint you configured,
-and the OpenRouter Images API is never used. Content sent to OpenRouter is also
-subject to OpenRouter's and the selected provider's data policies. Typer On cannot guarantee their retention or handling
-of that content. See [PRIVACY.md](PRIVACY.md) for the complete endpoint list and
+Local AI requests go only to the endpoint you configured, and the OpenRouter
+Images API is never used. Content sent through OpenRouter, Codex, or Claude
+Code is subject to the respective services' data policies. Typer On cannot
+guarantee their retention or handling of that content. See
+[PRIVACY.md](PRIVACY.md) for the app's HTTP endpoint list, CLI boundary, and
 data-handling notes.
 
 ## Development and testing
@@ -464,7 +510,7 @@ TyperOn/
 ├── Sources/
 │   ├── App/          Environment, coordinators, and panel lifecycle
 │   ├── Core/         Selection, replacement, clipboard, hotkeys, permissions
-│   ├── AI/           Provider setup, OpenRouter and local requests, catalog, streaming, replay
+│   ├── AI/           Provider setup, HTTP and subscription CLI requests, catalog, streaming, replay
 │   ├── Modules/      Built-in modules, custom prompts, and registry
 │   ├── UI/           Toolbar, Chat, Processing, Settings, onboarding, shared views
 │   └── Utilities/    Logging, preferences, and extensions
@@ -550,8 +596,16 @@ public issues.
 
 ## License
 
-Typer On is free and open source, licensed under the
-[Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution and
-[CONTRIBUTING.md](CONTRIBUTING.md) for the project's fork policy.
+Version `0.4.0` and later are source available under the
+[Typer On Individual Use License 1.0](LICENSE)
+(`LicenseRef-Typer-On-Individual-1.0`). Natural persons acting on their own
+behalf may use the app free of charge, including for independent professional
+work. Use by or on behalf of an organization requires a separate written
+license; contact [Maksim Nikolaev](https://github.com/notime2).
+
+Individuals may redistribute or fork under the same terms, preserving
+attribution, marking changes, and renaming derivatives. See [NOTICE](NOTICE)
+and [CONTRIBUTING.md](CONTRIBUTING.md). Earlier Apache-2.0 releases retain
+their original license rights. Sparkle remains covered by its MIT license.
 
 Copyright 2026 Maksim Nikolaev.

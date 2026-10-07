@@ -30,7 +30,7 @@
 		<true/>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2026 Maksim Nikolaev. Licensed under the Apache License, Version 2.0.</string>
+	<string>Copyright 2026 Maksim Nikolaev. Licensed under the Typer On Individual Use License 1.0.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Typer On uses screen capture only when you choose an area, window, or display to attach to Chat Mode.</string>
 	<key>SUFeedURL</key>

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-Typer-On-Individual-1.0
 // Copyright 2026 Maksim Nikolaev
 
 import Foundation
@@ -8,6 +8,31 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct AppEnvironmentProviderTests {
+    @Test
+    func rapidProviderChangesNeverSendThePreviousProvidersCredential() async throws {
+        let fixture = try ProviderEnvironmentFixture()
+        defer { fixture.cleanUp() }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ProviderCredentialSpy.self]
+        ProviderCredentialSpy.reset()
+        let environment = AppEnvironment(userDefaults: fixture.defaults,
+            catalogSession: URLSession(configuration: configuration), chatHistoryStore: ChatHistoryStore(fileURL: nil),
+            keychainAccessOverrides: KeychainAccessOverrides(read: { account in
+                account == "openrouter-api-key" ? "synthetic-router-key" : "synthetic-local-key"
+            }, write: { _, _ in }, delete: { _ in }))
+        fixture.defaults.setAIProvider(.openAICompatible)
+        fixture.defaults.setLocalEndpointBaseURL("http://localhost:1234/v1")
+        environment.bootstrap()
+        fixture.defaults.setAIProvider(.openRouter)
+        environment.bootstrap()
+        await environment.waitForCatalogBootstrapForTesting()
+        let requests = ProviderCredentialSpy.requests
+        #expect(!requests.isEmpty)
+        #expect(requests.allSatisfy {
+            $0.url?.host == "openrouter.ai" && $0.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-router-key"
+        })
+    }
+
     @Test
     func defaultInstallKeepsTheOpenRouterTransport() throws {
         let fixture = try ProviderEnvironmentFixture()
@@ -214,5 +239,22 @@ private final class ProviderNetworkSpy: URLProtocol, @unchecked Sendable {
         client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
     }
 
+    override func stopLoading() {}
+}
+
+private final class ProviderCredentialSpy: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var recorded: [URLRequest] = []
+    static var requests: [URLRequest] { lock.withLock { recorded } }
+    static func reset() { lock.withLock { recorded = [] } }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.lock.withLock { Self.recorded.append(request) }
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"data":[]}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
     override func stopLoading() {}
 }

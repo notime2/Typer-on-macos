@@ -25,13 +25,15 @@ invest time in preparing a patch for this repository.
 
 ## Forking
 
-You are free to fork Typer On and take it in your own direction. That is the
-point of the license. Two conditions from the
-[Apache License 2.0](LICENSE) apply:
+Version `0.4.0` and later use the
+[Typer On Individual Use License 1.0](LICENSE). Individuals acting on their
+own behalf may fork and redistribute under the same terms:
 
 1. Keep the copyright, license, and [NOTICE](NOTICE) attribution intact, and
-   mark the files you changed (Sections 4b, 4c, 4d).
-2. Rename your fork. The "Typer On" name and the author's name may not be
-   used to endorse or promote it (Section 6).
+   mark the files you changed.
+2. Rename your derivative. Do not use the "Typer On" name or the author's name
+   to imply endorsement.
 
-Beyond that, a fork owes the author nothing.
+Use by or on behalf of an organization requires a separate written license;
+contact [Maksim Nikolaev](https://github.com/notime2). Earlier Apache-2.0
+releases retain their original license rights.
