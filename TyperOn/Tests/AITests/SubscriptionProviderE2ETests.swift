@@ -11,6 +11,112 @@ import Testing
 @Suite(.serialized, .timeLimit(.minutes(2)))
 @MainActor
 struct SubscriptionProviderE2ETests {
+    @Test(arguments: ["codex", "claudeCode"])
+    func savedEffortReachesBothProcessingAndChat(providerID: String) async throws {
+        let fixture = try SubscriptionCLIFixture(providerID: providerID)
+        defer { fixture.cleanUp() }
+        fixture.defaults.set("high", forKey: providerID == "codex" ? "codexReasoningEffort" : "claudeReasoningEffort")
+        let environment = try fixture.environment()
+        let processing = ProcessingViewModel(environment: environment)
+        processing.process(module: TranslationModule(), selection: fixture.selection)
+        await processing.waitForPendingWorkForTesting()
+        #expect(processing.error == nil)
+        #expect(try fixture.lastEffort() == "high")
+
+        let chat = ChatViewModel(environment: environment)
+        chat.inputText = "Synthetic effort question"
+        chat.sendMessage()
+        await chat.waitForPendingWorkForTesting()
+        #expect(chat.error == nil)
+        #expect(try fixture.lastEffort() == "high")
+    }
+
+    @Test(arguments: ["codex", "claudeCode"])
+    func defaultEffortLeavesCLIConfigurationUntouched(providerID: String) async throws {
+        let fixture = try SubscriptionCLIFixture(providerID: providerID)
+        defer { fixture.cleanUp() }
+        let provider = try #require(AIProvider(rawValue: providerID))
+        fixture.defaults.setReasoningEffort("high", for: provider)
+        fixture.defaults.setReasoningEffort(nil, for: provider)
+        #expect(fixture.defaults.reasoningEffort(for: provider) == nil)
+        let environment = try fixture.environment()
+        #expect(environment.resolveAIConfig(for: TranslationModule()).reasoningEffort == nil)
+        let processing = ProcessingViewModel(environment: environment)
+        processing.process(module: TranslationModule(), selection: fixture.selection)
+        await processing.waitForPendingWorkForTesting()
+        #expect(processing.error == nil)
+        #expect(processing.resultText == "Synthetic reply")
+        #expect(try fixture.lastEffort() == nil)
+    }
+
+    @Test(arguments: ["codex", "claudeCode"])
+    func moduleOverrideReconcilesEffortAgainstItsOwnModel(providerID: String) async throws {
+        let fixture = try SubscriptionCLIFixture(providerID: providerID)
+        defer { fixture.cleanUp() }
+        let provider = try #require(AIProvider(rawValue: providerID))
+        fixture.defaults.setReasoningEffort("high", for: provider)
+        let environment = try fixture.environment()
+        for model in ["e2e-override", "e2e-no-effort", "e2e-unknown"] {
+            fixture.defaults.set(try JSONEncoder().encode([
+                "translation": ModuleAIConfig(useGlobal: false, customModel: model)
+            ]), for: .moduleAIConfigs)
+            let config = environment.resolveAIConfig(for: TranslationModule())
+            #expect(config.model == model)
+            #expect(config.reasoningEffort == "high")
+            let processing = ProcessingViewModel(environment: environment)
+            processing.process(module: TranslationModule(), selection: fixture.selection)
+            await processing.waitForPendingWorkForTesting()
+            #expect(processing.error == nil)
+            #expect(processing.resultText == "Synthetic reply")
+            #expect(try fixture.lastTurnInput().contains(model))
+            // Only Codex declares a fallback default for the override model.
+            #expect(try fixture.lastEffort() == (provider == .codex && model == "e2e-override" ? "low" : nil))
+            #expect(fixture.defaults.reasoningEffort(for: provider) == "high")
+        }
+    }
+
+    @Test(arguments: ["codex", "claudeCode"])
+    func modelCatalogPreservesAdvertisedEffortLevels(providerID: String) async throws {
+        let fixture = try SubscriptionCLIFixture(providerID: providerID)
+        defer { fixture.cleanUp() }
+        let provider = try #require(AIProvider(rawValue: providerID))
+        let source = ModelCatalogSource.subscription(provider: provider,
+            executablePath: fixture.defaults.subscriptionExecutablePath(for: provider))
+        let catalog = ModelCatalogService(userDefaults: fixture.defaults)
+        catalog.setSource(source)
+        await catalog.fetchModels(apiKey: "")
+        let connection = try #require(catalog.subscriptionConnectionResult)
+        try #require(connection.isReady)
+        let data = try JSONEncoder().encode(connection.models)
+        let models = try #require(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let model = try #require(models.first)
+        let efforts = model["reasoningEfforts"] as? [[String: Any]]
+        #expect(efforts?.contains { $0["id"] as? String == "high" } == true)
+        let cached = ModelCatalogService(userDefaults: fixture.defaults, allowsRemoteRequests: false)
+        cached.setSource(source)
+        await cached.loadCached()
+        let restored = try #require(cached.model(for: "e2e-model"))
+        #expect(restored.reasoningEfforts?.map(\.id) == (provider == .codex
+            ? ["low", "medium", "high"] : ["low", "medium", "high", "max"]))
+        #expect(restored.defaultReasoningEffort == (provider == .codex ? "medium" : nil))
+        #expect(restored == catalog.model(for: "e2e-model"))
+
+        // The old cache schema has neither optional effort field.
+        let legacy: [String: Any] = [
+            "executablePath": try #require(fixture.defaults.subscriptionExecutablePath(for: provider)),
+            "models": [["id": "legacy-model", "name": "Legacy model"]]
+        ]
+        fixture.defaults.set(try JSONSerialization.data(withJSONObject: legacy),
+            for: provider == .codex ? .cachedCodexModels : .cachedClaudeModels)
+        let legacyCatalog = ModelCatalogService(userDefaults: fixture.defaults, allowsRemoteRequests: false)
+        legacyCatalog.setSource(source)
+        await legacyCatalog.loadCached()
+        let legacyModel = try #require(legacyCatalog.model(for: "legacy-model"))
+        #expect(legacyModel.reasoningEfforts == nil)
+        #expect(legacyModel.defaultReasoningEffort == nil)
+        #expect(legacyModel.reconciledReasoningEffort("high") == nil)
+    }
+
     @Test
     func inheritedCustomHeadersCannotReplaceSubscriptionAuthentication() {
         let environment = SubscriptionCLI.environment(executable: URL(fileURLWithPath: "/synthetic/claude"), base: [
@@ -50,6 +156,7 @@ struct SubscriptionProviderE2ETests {
     func allTextActionsReachSelectedCLI(providerID: String) async throws {
         let fixture = try SubscriptionCLIFixture(providerID: providerID)
         defer { fixture.cleanUp() }
+        fixture.defaults.setReasoningEffort("high", for: try #require(AIProvider(rawValue: providerID)))
         let environment = try fixture.environment()
         let custom = CustomPromptModule(id: "e2e-custom", name: "E2E custom", icon: "star",
                                         shortDescription: nil, systemPrompt: "Return the synthetic result.")
@@ -63,6 +170,7 @@ struct SubscriptionProviderE2ETests {
             #expect(viewModel.error == nil, "Module \(module.id) failed: \(viewModel.error ?? "")")
             #expect(viewModel.resultText == "Synthetic reply", "Module \(module.id) did not stream")
             #expect(!viewModel.isStreaming)
+            #expect(try fixture.lastEffort() == "high", "Module \(module.id) dropped saved effort")
         }
         #expect(try fixture.recordedInput().contains("Synthetic selection"))
     }
@@ -71,6 +179,7 @@ struct SubscriptionProviderE2ETests {
     func chatFollowUpAndModuleOverrideReachCLI(providerID: String) async throws {
         let fixture = try SubscriptionCLIFixture(providerID: providerID)
         defer { fixture.cleanUp() }
+        fixture.defaults.setReasoningEffort("high", for: try #require(AIProvider(rawValue: providerID)))
         fixture.defaults.set(try JSONEncoder().encode([
             "content-generation": ModuleAIConfig(useGlobal: false, customModel: "e2e-override")
         ]), for: .moduleAIConfigs)
@@ -82,12 +191,14 @@ struct SubscriptionProviderE2ETests {
         await viewModel.waitForPendingWorkForTesting()
         #expect(viewModel.error == nil)
         #expect(viewModel.messages.last?.text == "Synthetic reply")
+        #expect(try fixture.lastEffort() == (providerID == "codex" ? "low" : nil))
         viewModel.inputText = "Synthetic follow-up"
         viewModel.sendMessage()
         await viewModel.waitForPendingWorkForTesting()
         #expect(viewModel.error == nil)
         #expect(viewModel.messages.filter { $0.role == .assistant }.count == 2)
         #expect(viewModel.messages.last?.text == "Synthetic reply")
+        #expect(try fixture.lastEffort() == (providerID == "codex" ? "low" : nil))
         let recorded = try fixture.lastTurnInput()
         for required in ["Synthetic context", "Synthetic first question", "Synthetic reply", "Synthetic follow-up", "e2e-override"] {
             #expect(recorded.contains(required), "CLI input missing \(required)")
@@ -98,6 +209,7 @@ struct SubscriptionProviderE2ETests {
     func refineAndAutomaticReplacementUseSuccessfulFinalResult(providerID: String) async throws {
         let fixture = try SubscriptionCLIFixture(providerID: providerID)
         defer { fixture.cleanUp() }
+        fixture.defaults.setReasoningEffort("high", for: try #require(AIProvider(rawValue: providerID)))
         let environment = try fixture.environment()
         var replacements: [String] = []
         let viewModel = ProcessingViewModel(environment: environment, replaceAction: { text, _ in
@@ -114,12 +226,14 @@ struct SubscriptionProviderE2ETests {
         #expect(viewModel.resultText == "Synthetic reply")
         #expect(replacements.count == 1)
         #expect(try fixture.lastTurnInput().contains("Synthetic refinement"))
+        #expect(try fixture.lastEffort() == "high")
     }
 
     @Test(arguments: ["codex", "claudeCode"])
     func failedTurnDoesNotReplaceAndRetryCanRecover(providerID: String) async throws {
         let fixture = try SubscriptionCLIFixture(providerID: providerID)
         defer { fixture.cleanUp() }
+        fixture.defaults.setReasoningEffort("high", for: try #require(AIProvider(rawValue: providerID)))
         try fixture.setMode("failure")
         let environment = try fixture.environment()
         var replacements = 0
@@ -137,6 +251,7 @@ struct SubscriptionProviderE2ETests {
         await viewModel.waitForPendingWorkForTesting()
         #expect(viewModel.error == nil)
         #expect(viewModel.resultText == "Synthetic reply")
+        #expect(try fixture.lastEffort() == "high")
     }
 
     @Test(arguments: ["codex", "claudeCode"])
@@ -148,6 +263,20 @@ struct SubscriptionProviderE2ETests {
         fixture.defaults.setGlobalModelID("original-openrouter-model", for: .openRouter)
         #expect(fixture.defaults.globalModelID(for: provider) == "subscription-model")
         #expect(fixture.defaults.globalModelID(for: .openRouter) == "original-openrouter-model")
+        fixture.defaults.setReasoningEffort("high", for: .codex)
+        fixture.defaults.setReasoningEffort("low", for: .claudeCode)
+        #expect(fixture.defaults.reasoningEffort(for: .codex) == "high")
+        #expect(fixture.defaults.reasoningEffort(for: .claudeCode) == "low")
+        fixture.defaults.setReasoningEffort(nil, for: .codex)
+        #expect(fixture.defaults.string(for: .codexReasoningEffort) == nil)
+        #expect(fixture.defaults.reasoningEffort(for: .claudeCode) == "low")
+        fixture.defaults.setReasoningEffort("max", for: .openRouter)
+        fixture.defaults.setReasoningEffort("max", for: .openAICompatible)
+        #expect(fixture.defaults.reasoningEffort(for: .openRouter) == nil)
+        #expect(fixture.defaults.reasoningEffort(for: .openAICompatible) == nil)
+        #expect(fixture.defaults.reasoningEffort(for: .claudeCode) == "low")
+        fixture.defaults.setReasoningEffort(" \n", for: .claudeCode)
+        #expect(fixture.defaults.string(for: .claudeReasoningEffort) == nil)
         let replay = try StreamReplayFixture(chunks: ["Replay"], intervalMilliseconds: 1)
         let environment = AppEnvironment(streamReplayFixture: replay, userDefaults: fixture.defaults,
                                          chatHistoryStore: ChatHistoryStore(fileURL: nil))
@@ -163,6 +292,7 @@ struct SubscriptionProviderE2ETests {
     func screenshotTravelsInMemoryToSelectedCLI(providerID: String) async throws {
         let fixture = try SubscriptionCLIFixture(providerID: providerID)
         defer { fixture.cleanUp() }
+        fixture.defaults.setReasoningEffort("high", for: try #require(AIProvider(rawValue: providerID)))
         let environment = try fixture.environment()
         let service = try #require(environment.aiService)
         // A synthetic 1x1 PNG, never a desktop screenshot or personal content.
@@ -178,6 +308,7 @@ struct SubscriptionProviderE2ETests {
         }
         #expect(result == "Synthetic reply")
         #expect(try fixture.recordedInput().contains(png))
+        #expect(try fixture.lastEffort() == "high")
         let files = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
         #expect(!files.contains { $0.hasSuffix(".png") })
     }
@@ -329,6 +460,19 @@ private struct SubscriptionCLIFixture {
 
     func recordedInput() throws -> String { try String(contentsOf: inputLog, encoding: .utf8) }
 
+    func lastEffort() throws -> String? {
+        let entries = try recordedInput().split(separator: "\n").compactMap {
+            try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
+        }
+        if providerID == "codex" {
+            return (entries.last { $0["method"] as? String == "turn/start" })?["params"]
+                .flatMap { $0 as? [String: Any] }?["effort"] as? String
+        }
+        let args = entries.compactMap { $0["argv"] as? [String] }.last { $0.contains("--system-prompt") }
+        guard let args, let index = args.firstIndex(of: "--effort"), args.indices.contains(index + 1) else { return nil }
+        return args[index + 1]
+    }
+
     func lastTurnInput() throws -> String {
         let entries = try recordedInput().split(separator: "\n").compactMap {
             try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
@@ -372,7 +516,8 @@ private struct SubscriptionCLIFixture {
         return (root / 'mode').read_text() if (root / 'mode').exists() else 'success'
     def stall():
         if mode() == 'stall':
-            (root / 'turn.pid').write_text(str(os.getpid()))
+            (root / 'turn.pid.tmp').write_text(str(os.getpid()))
+            (root / 'turn.pid.tmp').replace(root / 'turn.pid')
             signal.pause()
     record({'argv': sys.argv[1:]})
     if '--version' in sys.argv:
@@ -409,7 +554,11 @@ private struct SubscriptionCLIFixture {
             elif method == 'config/read':
                 result = {'config': {'mcp_servers': {}, 'plugins': {}, 'features': {}}}
             elif method == 'model/list':
-                result = {'data': [{'id': 'e2e-model', 'model': 'e2e-model', 'displayName': 'E2E model', 'description': '', 'hidden': False, 'isDefault': True, 'inputModalities': ['text', 'image'], 'supportedReasoningEfforts': [], 'defaultReasoningEffort': 'medium'}], 'nextCursor': None}
+                result = {'data': [
+                    {'id': 'e2e-model', 'model': 'e2e-model', 'displayName': 'E2E model', 'description': '', 'hidden': False, 'isDefault': True, 'inputModalities': ['text', 'image'], 'supportedReasoningEfforts': [{'reasoningEffort': level, 'description': level} for level in ['low', 'medium', 'high']], 'defaultReasoningEffort': 'medium'},
+                    {'id': 'e2e-override', 'model': 'e2e-override', 'displayName': 'Override model', 'hidden': False, 'inputModalities': ['text'], 'supportedReasoningEfforts': [{'reasoningEffort': 'low', 'description': 'Low only'}], 'defaultReasoningEffort': 'low'},
+                    {'id': 'e2e-no-effort', 'model': 'e2e-no-effort', 'displayName': 'No effort model', 'hidden': False, 'inputModalities': ['text']}
+                ], 'nextCursor': None}
             elif method == 'thread/start':
                 result = {'thread': {'id': 'e2e-thread'}}
             elif method == 'turn/start':
@@ -446,7 +595,11 @@ private struct SubscriptionCLIFixture {
             except ValueError:
                 message = {}
             if message.get('type') == 'control_request':
-                emit({'type': 'control_response', 'response': {'subtype': 'success', 'request_id': message['request_id'], 'response': {'models': [{'value': 'e2e-model', 'resolvedModel': 'claude-opus-5-5', 'displayName': 'E2E model'}]}}})
+                emit({'type': 'control_response', 'response': {'subtype': 'success', 'request_id': message['request_id'], 'response': {'models': [
+                    {'value': 'e2e-model', 'resolvedModel': 'claude-opus-5-5', 'displayName': 'E2E model', 'supportsEffort': True, 'supportedEffortLevels': ['low', 'medium', 'high', 'max']},
+                    {'value': 'e2e-override', 'resolvedModel': 'claude-sonnet-5-5', 'displayName': 'Override model', 'supportsEffort': True, 'supportedEffortLevels': ['low']},
+                    {'value': 'e2e-no-effort', 'resolvedModel': 'claude-haiku-4-5-20251001', 'displayName': 'No effort model'}
+                ]}}})
                 sys.exit(0)
             if '--input-format' in sys.argv:
                 break

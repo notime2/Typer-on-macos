@@ -56,7 +56,7 @@ struct DialogThemeViewTests {
         let editor = try #require(dialogDescendants(of: NSTextView.self, in: fixture.host).first)
         let selection = NSRange(location: 2, length: 6)
         editor.setSelectedRange(selection)
-        let scroll = try fixture.scrollAwayFromBottom()
+        let scroll = try await fixture.scrollAwayFromBottom()
         let scrollOrigin = scroll.contentView.bounds.origin
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -124,7 +124,7 @@ struct DialogThemeViewTests {
         let editor = try #require(dialogDescendants(of: NSTextView.self, in: fixture.host).first)
         let selection = NSRange(location: 1, length: 5)
         editor.setSelectedRange(selection)
-        let scroll = try fixture.scrollAwayFromBottom()
+        let scroll = try await fixture.scrollAwayFromBottom()
         let scrollOrigin = scroll.contentView.bounds.origin
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             fixture.setAppearance(appearance)
@@ -339,12 +339,16 @@ private final class DialogHostingFixture {
         try png.write(to: directory.appendingPathComponent(name + ".png"), options: .atomic)
     }
 
-    func scrollAwayFromBottom() throws -> NSScrollView {
+    func scrollAwayFromBottom() async throws -> NSScrollView {
         let scroll = try #require(dialogDescendants(of: NSScrollView.self, in: host).first {
             !($0.documentView is NSTextView) && ($0.documentView?.frame.height ?? 0) > $0.contentView.bounds.height + 80
         })
-        scroll.contentView.scroll(to: NSPoint(x: 0, y: 40))
+        let target = NSPoint(x: 0, y: 40)
+        scroll.contentView.scroll(to: target)
+        scroll.reflectScrolledClipView(scroll.contentView)
         NotificationCenter.default.post(name: NSScrollView.didLiveScrollNotification, object: scroll)
+        await settleLayout()
+        try #require(scroll.contentView.bounds.origin == target, "The test must establish a stable user scroll before changing themes")
         return scroll
     }
 

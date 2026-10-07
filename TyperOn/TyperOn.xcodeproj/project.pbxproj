@@ -148,6 +148,7 @@
 		CC91CE9C6F654500C802C043 /* StreamingTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6BE91970AC3B1AF981AD33 /* StreamingTextView.swift */; };
 		CDC80AA1B4A0BAAE69ECE7CC /* SelectionRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1AF3FA9CC750CBD7BF5A9A /* SelectionRecoveryTests.swift */; };
 		CDDD8FEFC8AAE6C26FF4A3A2 /* SubscriptionProviderLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8875B2526F2024AD0F53E18B /* SubscriptionProviderLiveTests.swift */; };
+		D04FF98CB08A6E1B1C26D51D /* SubscriptionReasoningEffortSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DF17D7E5099495A9070A1A /* SubscriptionReasoningEffortSlider.swift */; };
 		D199E8A7B8B6B0AB2F4E1FC6 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929E65DE6C08E46B568BD7E7 /* KeychainService.swift */; };
 		D40A3387C56297C3CD12001F /* TargetLanguageCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282BEEDACD15E316FE940F8B /* TargetLanguageCatalog.swift */; };
 		D91C9F6511D4B43B352605A8 /* APISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73B6BD2A7FB0ACD73CF3B9D /* APISettingsView.swift */; };
@@ -349,6 +350,7 @@
 		E2F2952223C5D616193552DF /* KeyComboCarbonModifiersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyComboCarbonModifiersTests.swift; sourceTree = "<group>"; };
 		E49327620F23AD2F41A8D7DA /* PanelLifecycleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLifecycleManager.swift; sourceTree = "<group>"; };
 		E559FC315BAE3A5992566D88 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		E6DF17D7E5099495A9070A1A /* SubscriptionReasoningEffortSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionReasoningEffortSlider.swift; sourceTree = "<group>"; };
 		E752C49A0339B58AA21DA67E /* AppCoordinatorChatModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinatorChatModeTests.swift; sourceTree = "<group>"; };
 		E7DC3A9BBBAB005529C9DF3D /* ChatLayoutStabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatLayoutStabilityTests.swift; sourceTree = "<group>"; };
 		E8B3F9E2BDFC609D84891723 /* MarkdownTextCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextCache.swift; sourceTree = "<group>"; };
@@ -554,6 +556,7 @@
 				85BFC20FDAEE4D25BAFE6EC4 /* SettingsSidebar.swift */,
 				4AA6754829BCA11AD140B141 /* SettingsWindow.swift */,
 				ECB552A95FBF39F635AFC9DC /* SubscriptionConnectionView.swift */,
+				E6DF17D7E5099495A9070A1A /* SubscriptionReasoningEffortSlider.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -993,6 +996,7 @@
 				61BF166A70AC0DCA3FE82EE0 /* SubscriptionAIService.swift in Sources */,
 				ECE961AEE0A1D5AAEC7C4916 /* SubscriptionCLI.swift in Sources */,
 				71881187CF6B239DFC7B6CE2 /* SubscriptionConnectionView.swift in Sources */,
+				D04FF98CB08A6E1B1C26D51D /* SubscriptionReasoningEffortSlider.swift in Sources */,
 				5D814BDDFBC9ADF972C8B61D /* SummarizationModule.swift in Sources */,
 				D40A3387C56297C3CD12001F /* TargetLanguageCatalog.swift in Sources */,
 				9F0F446B44797D6377CDF2E1 /* TextReplacer.swift in Sources */,
@@ -1131,7 +1135,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.4.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.typeron.app;
@@ -1204,7 +1208,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.4.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

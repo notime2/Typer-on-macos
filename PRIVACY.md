@@ -139,12 +139,15 @@ endpoint live in the Keychain too - the settings store records only whether an
 override exists.
 
 **Subscription authentication** belongs to the installed Codex or Claude Code
-CLI. Typer On saves its executable path and model choice, not its login
-tokens. Signing in uses the official CLI's authentication flow and storage.
+CLI. Typer On saves its executable path, model choice, and optional reasoning
+effort, not its login tokens. Signing in uses the official CLI's authentication
+flow and storage. The connection screen displays the account label and plan
+reported by the CLI; Typer On keeps those labels in memory and does not log them.
 
 **Settings** are in `UserDefaults` under the app's own domain: hotkey, default
 language, the selected provider, its base URL or CLI executable path, each
-provider's selected model, temperature and max tokens, enabled modules and their order, your
+provider's selected model and subscription reasoning effort, temperature and max
+tokens, enabled modules and their order, your
 custom prompts, per-module configuration, cached model catalogs, window
 size, and whether the chat history sidebar is shown. You can inspect them with
 `defaults read com.typeron.app`.

@@ -69,103 +69,93 @@ struct SubscriptionConnectionView: View {
         let state = SubscriptionConnectionState(catalog: statusCatalog)
         let executable = try? SubscriptionCLI.resolveExecutable(provider: provider, configuredPath: executablePath)
 
-        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
-            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                Text("Account").font(.system(size: 14, weight: .medium))
-                Text(
-                    "Uses the \(cliName) installed on this Mac and its existing \(accountName) subscription sign-in. "
-                        + "No API key is needed, and Typer On never reads the CLI's tokens."
-                )
-                .font(.system(size: 12))
-                .foregroundStyle(DS.Colors.textTertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-                statusRow(for: state)
-
+        Section("Connection") {
+            LabeledContent("Status") {
                 HStack(spacing: DS.Spacing.sm) {
-                    Button("Check Connection") {
+                    if state == .checking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: statusImage(for: state))
+                    }
+                    Text(state == .ready ? "Connected" : state.label)
+                    Button {
                         signInNote = nil
                         onCheckConnection()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.glass)
+                    .controlSize(.small)
                     .disabled(state == .checking)
-
-                    Button("Sign In...") {
-                        startSignIn()
-                    }
-                    .buttonStyle(.glass)
-                    .disabled(executable == nil)
-                    .help("Opens Terminal and runs the CLI's own sign-in command.")
-
-                    Spacer(minLength: 0)
+                    .accessibilityLabel("Check connection")
+                    .help("Check connection")
                 }
-
-                if let signInNote {
-                    Text(signInNote)
-                        .font(.system(size: 12))
-                        .foregroundStyle(DS.Colors.textTertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
+                .foregroundStyle(statusTint(for: state))
             }
 
-            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                Text("Executable").font(.system(size: 14, weight: .medium))
+            LabeledContent {
+                Button(state == .ready ? "Sign In..." : "Sign in with \(accountName)") {
+                    startSignIn()
+                }
+                .buttonStyle(.glass)
+                .disabled(executable == nil)
+            } label: {
+                Text("Account")
+                Text(accountSummary)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
 
-                executableRow(resolved: executable)
+            if state == .connectionFailed || state == .executableMissing,
+               let message = statusCatalog.subscriptionConnectionResult?.message {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let signInNote {
+                Text(signInNote)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
 
-                HStack(spacing: DS.Spacing.sm) {
-                    Button("Choose...") {
-                        chooseExecutable(startingAt: executable)
-                    }
-                    .buttonStyle(.glass)
-
-                    if executablePath != nil {
-                        Button("Use Automatic Detection") {
-                            executablePath = nil
-                        }
+            DisclosureGroup("Details") {
+                LabeledContent {
+                    Button("Choose...") { chooseExecutable(startingAt: executable) }
                         .buttonStyle(.glass)
+                } label: {
+                    Text("Executable")
+                    if let path = executablePath ?? executable?.path {
+                        Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
+                            .font(.callout.monospaced())
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                            .help(path)
+                    } else {
+                        Text("Install \(cliName), or choose its location.")
                     }
-
-                    Spacer(minLength: 0)
                 }
+                if executablePath != nil {
+                    Button("Use Automatic Detection") { executablePath = nil }
+                        .buttonStyle(.glass)
+                }
+                Text("Sign-in opens in Terminal. After signing in, check the connection again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Image generation requires selecting OpenRouter.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
-            Text(
-                "Text modules, custom prompts and Chat Mode run through this CLI. Screenshot input works with "
-                    + "listed models that report image input; a custom model ID stays text-only. Image generation "
-                    + "is unavailable through this integration - select OpenRouter yourself to generate images."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(DS.Colors.textTertiary)
-            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func statusRow(for state: SubscriptionConnectionState) -> some View {
-        HStack(alignment: .top, spacing: DS.Spacing.sm) {
-            if state == .checking {
-                ProgressView().controlSize(.small)
-            } else {
-                Image(systemName: statusImage(for: state))
-            }
-            Text(statusText(for: state))
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-        }
-        .font(.system(size: 12))
-        .foregroundStyle(statusTint(for: state))
-    }
-
-    private func statusText(for state: SubscriptionConnectionState) -> String {
-        switch state {
-        case .notChecked:
-            return "Not checked yet. Use Check Connection."
-        case .checking:
-            return "Checking the \(cliName) and its sign-in..."
-        case .ready, .executableMissing, .connectionFailed:
-            return statusCatalog.subscriptionConnectionResult?.message ?? state.label
-        }
+    private var accountSummary: String {
+        let result = statusCatalog.subscriptionConnectionResult
+        let parts = [result?.accountLabel, result?.accountDetail].compactMap { $0 }
+        return parts.isEmpty ? "Use your \(accountName) subscription." : parts.joined(separator: " · ")
     }
 
     private func statusImage(for state: SubscriptionConnectionState) -> String {
@@ -181,37 +171,6 @@ struct SubscriptionConnectionView: View {
         case .ready: .green
         case .notChecked, .checking: DS.Colors.textTertiary
         case .executableMissing, .connectionFailed: .orange
-        }
-    }
-
-    @ViewBuilder
-    private func executableRow(resolved: URL?) -> some View {
-        if let path = executablePath ?? resolved?.path {
-            Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(DS.Colors.textSecondary)
-                .lineLimit(2)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-                .help(path)
-        }
-
-        Text(executableHint(isResolved: resolved != nil))
-            .font(.system(size: 12))
-            .foregroundStyle(resolved == nil ? .orange : DS.Colors.textTertiary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func executableHint(isResolved: Bool) -> String {
-        switch (executablePath != nil, isResolved) {
-        case (true, true):
-            return "Chosen manually."
-        case (true, false):
-            return "This file cannot be run. Choose the \(cliName) executable or use automatic detection."
-        case (false, true):
-            return "Detected automatically."
-        case (false, false):
-            return "Not found in ~/.local/bin, Homebrew or PATH. Install the \(cliName) or choose its executable."
         }
     }
 

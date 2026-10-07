@@ -98,4 +98,5 @@ struct ResolvedAIConfig: Sendable {
     let model: String
     let temperature: Double
     let maxTokens: Int
+    var reasoningEffort: String? = nil
 }

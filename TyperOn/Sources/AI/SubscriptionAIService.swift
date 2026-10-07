@@ -19,10 +19,10 @@ struct SubscriptionAIService: AIService {
                     let executable = try SubscriptionCLI.resolveExecutable(provider: provider, configuredPath: executablePath)
                     if provider == .codex {
                         try await codex(request: request, model: request.model.isEmpty ? config.model : request.model,
-                            executable: executable, continuation: continuation)
+                            reasoningEffort: config.reasoningEffort, executable: executable, continuation: continuation)
                     } else {
                         try await claude(request: request, model: request.model.isEmpty ? config.model : request.model,
-                            executable: executable, continuation: continuation)
+                            reasoningEffort: config.reasoningEffort, executable: executable, continuation: continuation)
                     }
                     try Task.checkCancellation()
                     continuation.finish()
@@ -36,18 +36,21 @@ struct SubscriptionAIService: AIService {
         throw AIServiceFeatureError.imageGenerationUnsupported
     }
 
-    private func codex(request: ChatRequest, model: String, executable: URL,
+    private func codex(request: ChatRequest, model: String, reasoningEffort: String?, executable: URL,
                        continuation: AsyncThrowingStream<String, Error>.Continuation) async throws {
         let session = try await SubscriptionCodexSession.start(executable: executable)
         let child = session.child
         defer { child.close() }
         try await withTaskCancellationHandler {
             try await session.requireSubscription()
-            if request.messages.contains(where: { !$0.imageURLs.isEmpty }) {
+            let hasImages = request.messages.contains(where: { !$0.imageURLs.isEmpty })
+            var requestModel: OpenRouterModel?
+            if hasImages || (reasoningEffort != nil && !model.isEmpty) {
                 let models = try await session.models()
-                guard models.first(where: { $0.id == model })?.supportsImageInput == true else {
-                    throw SubscriptionCLIError.imageInputUnsupported
-                }
+                requestModel = models.first(where: { $0.id == model })
+            }
+            if hasImages, requestModel?.supportsImageInput != true {
+                throw SubscriptionCLIError.imageInputUnsupported
             }
             var threadParams: [String: Any] = [
                 "modelProvider": "openai", "cwd": child.directory.path,
@@ -75,6 +78,9 @@ struct SubscriptionAIService: AIService {
                 "approvalPolicy": "never", "environments": [],
                 "sandboxPolicy": ["type": "readOnly", "networkAccess": false]]
             if !model.isEmpty { turnParams["model"] = model }
+            if let effort = requestModel?.reconciledReasoningEffort(reasoningEffort) {
+                turnParams["effort"] = effort
+            }
             let result = try await session.request("turn/start", params: turnParams)
             guard let turnID = (result["turn"] as? [String: Any])?["id"] as? String else {
                 throw SubscriptionCLIError.malformed
@@ -123,18 +129,23 @@ struct SubscriptionAIService: AIService {
         } onCancel: { child.close(throwing: CancellationError()) }
     }
 
-    private func claude(request: ChatRequest, model: String, executable: URL,
+    private func claude(request: ChatRequest, model: String, reasoningEffort: String?, executable: URL,
                         continuation: AsyncThrowingStream<String, Error>.Continuation) async throws {
         try await SubscriptionCLI.requireClaudeSubscription(executable: executable)
-        if request.messages.contains(where: { !$0.imageURLs.isEmpty }) {
+        let hasImages = request.messages.contains(where: { !$0.imageURLs.isEmpty })
+        var requestModel: OpenRouterModel?
+        if hasImages || (reasoningEffort != nil && !model.isEmpty) {
             let models = try await SubscriptionCLI.claudeModels(executable: executable)
-            guard models.first(where: { $0.id == model })?.supportsImageInput == true
-                || SubscriptionCLI.claudeArchitecture(resolvedModel: model) != nil else {
-                throw SubscriptionCLIError.imageInputUnsupported
-            }
+            requestModel = models.first(where: { $0.id == model })
+        }
+        if hasImages, requestModel?.supportsImageInput != true
+            && SubscriptionCLI.claudeArchitecture(resolvedModel: model) == nil {
+            throw SubscriptionCLIError.imageInputUnsupported
         }
         let systems = request.messages.filter { $0.role == "system" }.map(\.content).joined(separator: "\n\n")
+        let effort = requestModel?.reconciledReasoningEffort(reasoningEffort)
         let arguments = SubscriptionCLI.claudeArguments + (model.isEmpty ? [] : ["--model", model])
+            + (effort.map { ["--effort", $0] } ?? [])
             + ["--system-prompt", systems]
         let child = try SubscriptionProcess(executable: executable, arguments: arguments, timeout: 15)
         defer { child.close() }

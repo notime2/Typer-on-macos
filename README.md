@@ -91,7 +91,7 @@ Settings -> Privacy & Security -> Accessibility** still looks enabled but no
 longer applies. Remove it with **-**, then add `/Applications/Typer On.app`
 again with **+** and switch it on.
 
-**Development status:** the project is configured as version `0.4.0`. Release
+**Development status:** the project is configured as version `0.4.1`. Release
 DMGs are built by GitHub Actions and signed with the project's self-signed
 identity; local builds are ad-hoc signed. Neither is notarized. Compatibility depends on the source
 app's Accessibility support; the presence of a capture profile or automated
@@ -371,7 +371,7 @@ This bypasses quarantine protection; it does not verify the app's integrity.
 | Section | Controls |
 |---------|----------|
 | General | Launch at login, auto-detection, default language (follows the system language until set), interface theme, global shortcut, Accessibility status, and automatic update checks and installation |
-| API \ Models | OpenRouter, OpenAI-compatible local, Codex, or Claude Code; provider credentials or CLI connection, searchable model catalog, and supported generation settings |
+| API \ Models | OpenRouter, OpenAI-compatible local, Codex, or Claude Code; credentials or CLI account, searchable HTTP model catalog or native CLI model/effort controls, and supported generation settings |
 | Modules | Enabled modules and order, per-module key/model, output-language mode, prompt overrides, and optional automatic replacement |
 | Custom Modules | Create and edit custom prompt modules |
 | Chat History | Saved chats and module runs: read a transcript, delete one chat, or clear everything |
@@ -386,8 +386,10 @@ This bypasses quarantine protection; it does not verify the app's integrity.
 **Claude Code** uses the official Claude Code CLI signed in with your Claude
 account. Install and authenticate the CLI you want to use first, then select
 it in **Settings -> API \ Models**. If the executable is not detected,
-choose its installed path. Check the connection, select a model from that
-CLI's catalog, and save.
+choose its installed path under **Connection -> Details**. The grouped form
+shows your connection, account, model, and reasoning effort. Select a model
+from the CLI's catalog and save; a custom model ID is available under the
+model's **Details**.
 
 The selected subscription provider handles all built-in text modules, custom
 prompts, Chat Mode, refinements, and supported screenshot analysis. Per-module
@@ -396,8 +398,14 @@ OpenRouter, local, and module API keys are preserved and do not authorize CLI
 requests. Signing in, subscription eligibility, and usage limits are handled
 by the official CLI and its service.
 
-Codex and Claude Code use their own generation defaults. Typer On's
-temperature and maximum-output-token settings are unavailable for these
+**Reasoning Effort** uses the levels advertised by the CLI. Unsupported levels
+are locked for the selected model. Each subscription provider keeps its own
+saved choice; **Default** leaves the CLI's effort setting unchanged. The choice
+also applies to module model overrides, after checking that model's supported
+levels. An unsupported choice uses a supported model default, when declared,
+or leaves effort to the CLI. Unknown custom models use the CLI's default.
+
+Temperature and maximum-output-token settings are unavailable for these
 providers; saved API-provider values are preserved.
 
 These integrations request AI responses without granting tools access to your

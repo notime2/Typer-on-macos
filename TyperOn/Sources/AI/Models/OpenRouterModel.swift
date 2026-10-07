@@ -3,6 +3,15 @@
 
 import Foundation
 
+struct ReasoningEffortOption: Codable, Identifiable, Sendable, Hashable {
+    let id: String
+    let detail: String
+
+    var displayName: String {
+        id.lowercased() == "xhigh" ? "XHigh" : id.capitalized
+    }
+}
+
 struct OpenRouterModel: Codable, Identifiable, Sendable, Hashable {
     struct Architecture: Codable, Sendable, Hashable {
         let input_modalities: [String]?
@@ -18,17 +27,23 @@ struct OpenRouterModel: Codable, Identifiable, Sendable, Hashable {
     let name: String
     let context_length: Int?
     let architecture: Architecture?
+    let reasoningEfforts: [ReasoningEffortOption]?
+    let defaultReasoningEffort: String?
 
     init(
         id: String,
         name: String,
         context_length: Int?,
-        architecture: Architecture? = nil
+        architecture: Architecture? = nil,
+        reasoningEfforts: [ReasoningEffortOption]? = nil,
+        defaultReasoningEffort: String? = nil
     ) {
         self.id = id
         self.name = name
         self.context_length = context_length
         self.architecture = architecture
+        self.reasoningEfforts = reasoningEfforts
+        self.defaultReasoningEffort = defaultReasoningEffort
     }
 
     var displayName: String {
@@ -49,6 +64,14 @@ struct OpenRouterModel: Codable, Identifiable, Sendable, Hashable {
 
     var hasCompleteModalityMetadata: Bool {
         architecture?.input_modalities != nil && architecture?.output_modalities != nil
+    }
+
+    func reconciledReasoningEffort(_ requested: String?) -> String? {
+        guard let requested, let reasoningEfforts else { return nil }
+        if reasoningEfforts.contains(where: { $0.id == requested }) { return requested }
+        guard let defaultReasoningEffort,
+              reasoningEfforts.contains(where: { $0.id == defaultReasoningEffort }) else { return nil }
+        return defaultReasoningEffort
     }
 
     private static func isImageModality(_ modality: String) -> Bool {

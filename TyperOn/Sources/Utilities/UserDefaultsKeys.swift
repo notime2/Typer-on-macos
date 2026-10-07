@@ -14,6 +14,8 @@ enum SettingsKey: String {
     case localSelectedModel
     case codexSelectedModel
     case claudeSelectedModel
+    case codexReasoningEffort
+    case claudeReasoningEffort
     case codexExecutablePath
     case claudeExecutablePath
     case cachedCodexModels
@@ -156,6 +158,23 @@ extension UserDefaults {
 
     func setActiveGlobalModelID(_ modelID: String) {
         setGlobalModelID(modelID, for: aiProviderSettings.provider)
+    }
+
+    func reasoningEffort(for provider: AIProvider) -> String? {
+        switch provider {
+        case .codex: string(for: .codexReasoningEffort)
+        case .claudeCode: string(for: .claudeReasoningEffort)
+        case .openRouter, .openAICompatible: nil
+        }
+    }
+
+    func setReasoningEffort(_ effort: String?, for provider: AIProvider) {
+        let effort = effort?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch provider {
+        case .codex: set(effort?.isEmpty == false ? effort : nil, for: .codexReasoningEffort)
+        case .claudeCode: set(effort?.isEmpty == false ? effort : nil, for: .claudeReasoningEffort)
+        case .openRouter, .openAICompatible: break
+        }
     }
 
     func subscriptionExecutablePath(for provider: AIProvider) -> String? {

@@ -14,10 +14,12 @@ struct SubscriptionProviderLiveTests {
     func installedSubscriptionStreamsTextAndUnderstandsImage(provider: AIProvider) async throws {
         let connection = await SubscriptionCLI.checkConnection(provider: provider, executablePath: nil)
         try #require(connection.isReady, "The installed CLI is not signed in with a subscription")
-        let model = try #require(connection.models.first(where: { $0.supportsImageInput }),
-                                 "No exact model with image-input metadata was returned")
+        let model = try #require(connection.models.first(where: {
+            $0.supportsImageInput && $0.reasoningEfforts?.contains { $0.id == "low" } == true
+        }), "No exact model advertising image input and Low effort was returned")
         let service = SubscriptionAIService(provider: provider, executablePath: connection.executablePath)
-        let config = ResolvedAIConfig(apiKey: "", model: model.id, temperature: 0.1, maxTokens: 100)
+        let config = ResolvedAIConfig(apiKey: "", model: model.id, temperature: 0.1, maxTokens: 100,
+                                      reasoningEffort: "low")
         let textRequest = ChatRequest(model: model.id, messages: [
             .system("Return only the exact requested text."),
             .user("Return exactly TYPERON_SUBSCRIPTION_OK")

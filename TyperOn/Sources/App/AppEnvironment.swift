@@ -207,7 +207,8 @@ final class AppEnvironment {
                     : globalKey,
                 model: config.customModel ?? globalModel,
                 temperature: config.customTemperature ?? (globalTemp > 0 ? globalTemp : AIModelDefaults.defaultTemperature),
-                maxTokens: config.customMaxTokens ?? (globalMaxTokens > 0 ? globalMaxTokens : AIModelDefaults.defaultMaxTokens)
+                maxTokens: config.customMaxTokens ?? (globalMaxTokens > 0 ? globalMaxTokens : AIModelDefaults.defaultMaxTokens),
+                reasoningEffort: userDefaults.reasoningEffort(for: providerSettings.provider)
             )
         }
 
@@ -215,7 +216,8 @@ final class AppEnvironment {
             apiKey: globalKey,
             model: globalModel,
             temperature: globalTemp > 0 ? globalTemp : AIModelDefaults.defaultTemperature,
-            maxTokens: globalMaxTokens > 0 ? globalMaxTokens : AIModelDefaults.defaultMaxTokens
+            maxTokens: globalMaxTokens > 0 ? globalMaxTokens : AIModelDefaults.defaultMaxTokens,
+            reasoningEffort: userDefaults.reasoningEffort(for: providerSettings.provider)
         )
     }
 

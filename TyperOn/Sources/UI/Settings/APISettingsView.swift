@@ -14,6 +14,8 @@ struct APISettingsView: View {
     @State private var localSelectedModel: String
     @State private var codexSelectedModel: String
     @State private var claudeSelectedModel: String
+    @State private var codexReasoningEffort: String?
+    @State private var claudeReasoningEffort: String?
     /// Explicit CLI executables; `nil` searches the usual install locations.
     @State private var codexExecutablePath: String?
     @State private var claudeExecutablePath: String?
@@ -51,6 +53,8 @@ struct APISettingsView: View {
         _localSelectedModel = State(initialValue: defaults.globalModelID(for: .openAICompatible))
         _codexSelectedModel = State(initialValue: defaults.globalModelID(for: .codex))
         _claudeSelectedModel = State(initialValue: defaults.globalModelID(for: .claudeCode))
+        _codexReasoningEffort = State(initialValue: defaults.reasoningEffort(for: .codex))
+        _claudeReasoningEffort = State(initialValue: defaults.reasoningEffort(for: .claudeCode))
         _codexExecutablePath = State(initialValue: defaults.subscriptionExecutablePath(for: .codex))
         _claudeExecutablePath = State(initialValue: defaults.subscriptionExecutablePath(for: .claudeCode))
         _temperature = State(initialValue: defaults.object(forKey: SettingsKey.temperature.rawValue) != nil ? temp : 0.7)
@@ -66,6 +70,7 @@ struct APISettingsView: View {
                 applyDraftCatalogSource()
             }
             .onChange(of: provider) { _, _ in
+                saved = false
                 connectionResult = nil
                 loadCredentialIfNeeded()
                 applyDraftCatalogSource()
@@ -79,9 +84,26 @@ struct APISettingsView: View {
             .onChange(of: localAPIKey) { _, _ in
                 invalidateConnectionTest()
             }
+            .onChange(of: modelBinding.wrappedValue) { _, _ in
+                saved = false
+                reconcileEffort()
+            }
+            .onChange(of: draftCatalog.models) { _, _ in reconcileEffort() }
+            .onChange(of: draftCatalog.isLoading) { _, loading in
+                if !loading { reconcileEffort() }
+            }
     }
 
+    @ViewBuilder
     private var contentContainer: some View {
+        if provider.isSubscription {
+            subscriptionForm
+        } else {
+            httpContentContainer
+        }
+    }
+
+    private var httpContentContainer: some View {
         GeometryReader { geometry in
             ScrollView {
                 content
@@ -122,7 +144,7 @@ struct APISettingsView: View {
             case .openAICompatible:
                 localEndpointSection
             case .codex, .claudeCode:
-                subscriptionSection
+                EmptyView()
             }
 
             Divider().foregroundStyle(DS.Colors.separator)
@@ -148,18 +170,7 @@ struct APISettingsView: View {
                 Divider().foregroundStyle(DS.Colors.separator)
             }
 
-            HStack {
-                Spacer()
-                if saved {
-                    Text("Saved!").font(.system(size: 13)).foregroundStyle(.green)
-                }
-                Button("Save") {
-                    save()
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .disabled(environment.isStreamReplay)
-            }
+            saveRow
         }
         .padding(DS.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -215,9 +226,16 @@ struct APISettingsView: View {
         }
     }
 
-    private var subscriptionSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
-            sectionHeader(provider == .codex ? "Codex CLI" : "Claude Code CLI")
+    // Reuses MeetingRecorder's Processing settings: grouped rows, native picker and ticked slider.
+    private var subscriptionForm: some View {
+        Form {
+            Section {
+                Picker("Provider", selection: $provider) {
+                    ForEach(AIProvider.allCases, id: \.self) { candidate in
+                        Text(candidate.displayName).tag(candidate)
+                    }
+                }
+            }
 
             SubscriptionConnectionView(
                 provider: provider,
@@ -225,10 +243,106 @@ struct APISettingsView: View {
                 executablePath: provider == .codex ? $codexExecutablePath : $claudeExecutablePath,
                 onCheckConnection: { checkSubscriptionConnection() }
             )
-            // Codex and Claude Code share this slot; a sign-in note must not carry over.
             .id(provider)
+
+            Section("Model") {
+                Picker("Model", selection: modelBinding) {
+                    Text("CLI Default").tag("")
+                    ForEach(draftCatalog.models) { model in
+                        Text(model.displayName).tag(model.id)
+                    }
+                    if !modelBinding.wrappedValue.isEmpty, selectedSubscriptionModel == nil {
+                        Text(modelBinding.wrappedValue).tag(modelBinding.wrappedValue)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                    LabeledContent {
+                        Text(selectedEffort?.displayName ?? "Default")
+                            .foregroundStyle(.secondary)
+                    } label: {
+                        Text("Reasoning Effort")
+                        Text(effortDetail)
+                    }
+                    SubscriptionReasoningEffortSlider(
+                        efforts: effortOptions,
+                        availableEffortIDs: Set(selectedSubscriptionModel?.reasoningEfforts?.map(\.id) ?? []),
+                        selectedEffortID: effortBinding.wrappedValue,
+                        selectedModelName: selectedSubscriptionModel?.displayName,
+                        isEnabled: selectedSubscriptionModel?.reasoningEfforts?.isEmpty == false,
+                        onSelect: { effortBinding.wrappedValue = $0; saved = false }
+                    )
+                }
+
+                DisclosureGroup("Details") {
+                    TextField("Model ID", text: modelBinding)
+                    Text("A custom model uses its default effort until the CLI reports supported levels.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            saveRow
         }
+        .formStyle(.grouped)
         .disabled(environment.isStreamReplay)
+    }
+
+    private var saveRow: some View {
+        HStack {
+            Spacer()
+            if saved {
+                Text("Saved!").font(.system(size: 13)).foregroundStyle(.green)
+            }
+            Button("Save") { save() }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(environment.isStreamReplay)
+        }
+    }
+
+    private var selectedSubscriptionModel: OpenRouterModel? {
+        draftCatalog.models.first { $0.id == modelBinding.wrappedValue }
+    }
+
+    private var effortBinding: Binding<String?> {
+        provider == .codex ? $codexReasoningEffort : $claudeReasoningEffort
+    }
+
+    private var effortOptions: [ReasoningEffortOption] {
+        var seen = Set<String>()
+        var options = draftCatalog.models.flatMap { $0.reasoningEfforts ?? [] }.filter { seen.insert($0.id).inserted }
+        if let saved = effortBinding.wrappedValue, seen.insert(saved).inserted {
+            options.append(ReasoningEffortOption(id: saved, detail: "Unavailable for this model."))
+        }
+        return options
+    }
+
+    private var selectedEffort: ReasoningEffortOption? {
+        effortOptions.first { $0.id == effortBinding.wrappedValue }
+    }
+
+    private var effortDetail: String {
+        if modelBinding.wrappedValue.isEmpty { return "Choose a model to adjust reasoning effort." }
+        if selectedSubscriptionModel == nil { return "Unavailable for this model. Your effort choice is kept." }
+        if let detail = selectedEffort?.detail, !detail.isEmpty { return detail }
+        if selectedSubscriptionModel?.reasoningEfforts?.isEmpty == false {
+            return "Higher effort allows more thinking time."
+        }
+        return draftCatalog.isLoading ? "Loading supported levels..." : "Uses this model's default reasoning level."
+    }
+
+    private func reconcileEffort() {
+        guard provider.isSubscription, draftCatalog.source == draftCatalogSource else { return }
+        // Keep the draft while a custom ID is unknown or still being typed, as in MeetingRecorder.
+        // Requests independently omit effort unless the exact model advertises support.
+        guard let model = selectedSubscriptionModel else { return }
+        if model.reasoningEfforts != nil {
+            effortBinding.wrappedValue = model.reconciledReasoningEffort(effortBinding.wrappedValue)
+        } else if !draftCatalog.isLoading, draftCatalog.subscriptionConnectionResult?.isReady == true {
+            // An old cache without capability fields must not erase a preference while refreshing.
+            effortBinding.wrappedValue = nil
+        }
     }
 
     private var openRouterSection: some View {
@@ -413,8 +527,17 @@ struct APISettingsView: View {
 
     private func applyDraftCatalogSource() {
         invalidateConnectionTest()
-        draftCatalog.setSource(draftCatalogSource)
-        Task { await draftCatalog.loadCached() }
+        let source = draftCatalogSource
+        draftCatalog.setSource(source)
+        Task {
+            await draftCatalog.loadCached()
+            guard draftCatalogSource == source, !environment.isStreamReplay else { return }
+            if source.provider.isSubscription {
+                await draftCatalog.fetchModels(apiKey: "", source: source)
+                guard draftCatalogSource == source else { return }
+                reconcileEffort()
+            }
+        }
     }
 
     private func invalidateConnectionTest() {
@@ -535,6 +658,8 @@ struct APISettingsView: View {
         UserDefaults.standard.setGlobalModelID(localSelectedModel, for: .openAICompatible)
         UserDefaults.standard.setGlobalModelID(codexSelectedModel, for: .codex)
         UserDefaults.standard.setGlobalModelID(claudeSelectedModel, for: .claudeCode)
+        UserDefaults.standard.setReasoningEffort(codexReasoningEffort, for: .codex)
+        UserDefaults.standard.setReasoningEffort(claudeReasoningEffort, for: .claudeCode)
         UserDefaults.standard.setSubscriptionExecutablePath(codexExecutablePath, for: .codex)
         UserDefaults.standard.setSubscriptionExecutablePath(claudeExecutablePath, for: .claudeCode)
         if !provider.isSubscription {

@@ -9,6 +9,23 @@ struct SubscriptionConnectionResult: Sendable {
     let message: String
     let executablePath: String?
     let models: [OpenRouterModel]
+    let accountLabel: String?
+    let accountDetail: String?
+
+    init(isReady: Bool, message: String, executablePath: String?, models: [OpenRouterModel],
+         accountLabel: String? = nil, accountDetail: String? = nil) {
+        self.isReady = isReady
+        self.message = message
+        self.executablePath = executablePath
+        self.models = models
+        self.accountLabel = accountLabel
+        self.accountDetail = accountDetail
+    }
+}
+
+struct SubscriptionAccount: Sendable {
+    let label: String
+    let detail: String
 }
 
 enum SubscriptionCLIError: LocalizedError, Sendable {
@@ -60,18 +77,19 @@ enum SubscriptionCLI {
                 let executable = try resolveExecutable(provider: provider, configuredPath: executablePath)
                 path = executable.path
                 let models: [OpenRouterModel]
+                let account: SubscriptionAccount
                 if provider == .codex {
                     let session = try await SubscriptionCodexSession.start(executable: executable)
                     defer { session.child.close() }
-                    try await session.requireSubscription()
+                    account = try await session.requireSubscription()
                     models = try await session.models()
                 } else {
-                    try await requireClaudeSubscription(executable: executable)
+                    account = try await requireClaudeSubscription(executable: executable)
                     models = try await claudeModels(executable: executable)
                 }
                 return SubscriptionConnectionResult(isReady: true,
                     message: "Signed in with \(provider == .codex ? "ChatGPT" : "Claude") subscription.",
-                    executablePath: path, models: models)
+                    executablePath: path, models: models, accountLabel: account.label, accountDetail: account.detail)
             } catch {
                 return SubscriptionConnectionResult(isReady: false, message: error.localizedDescription,
                     executablePath: path, models: [])
@@ -103,11 +121,12 @@ enum SubscriptionCLI {
         "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}", "--no-session-persistence",
         "--disable-slash-commands", "--no-chrome", "--permission-prompts", "none"]
 
-    static func requireClaudeSubscription(executable: URL) async throws {
+    @discardableResult
+    static func requireClaudeSubscription(executable: URL) async throws -> SubscriptionAccount {
         let child = try SubscriptionProcess(executable: executable,
             arguments: ["--safe-mode", "--restricted", "auth", "status", "--json"], timeout: 15)
         defer { child.close() }
-        try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler {
             child.closeInput()
             var data = Data()
             do {
@@ -126,6 +145,9 @@ enum SubscriptionCLI {
                 throw SubscriptionCLIError.apiKeyAccount("Claude Code")
             }
             try await requireClaudeLoginNotExpired(executable: executable)
+            let email = (status["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return SubscriptionAccount(label: email.flatMap { $0.isEmpty ? nil : $0 } ?? "Claude",
+                                       detail: "Claude \(plan.capitalized)")
         } onCancel: { child.close(throwing: CancellationError()) }
     }
 
@@ -163,8 +185,13 @@ enum SubscriptionCLI {
                       let models = response["models"] as? [[String: Any]] else { throw SubscriptionCLIError.malformed }
                 return models.compactMap { entry in
                     guard let id = entry["value"] as? String, !id.isEmpty else { return nil }
+                    let efforts = entry["supportsEffort"] as? Bool == true
+                        ? (entry["supportedEffortLevels"] as? [String])?.filter { !$0.isEmpty }.map {
+                            ReasoningEffortOption(id: $0, detail: "")
+                        } : nil
                     return OpenRouterModel(id: id, name: entry["displayName"] as? String ?? id,
-                        context_length: nil, architecture: claudeArchitecture(resolvedModel: entry["resolvedModel"] as? String))
+                        context_length: nil, architecture: claudeArchitecture(resolvedModel: entry["resolvedModel"] as? String),
+                        reasoningEfforts: efforts)
                 }
             }
             throw SubscriptionCLIError.closed
@@ -391,13 +418,17 @@ final class SubscriptionCodexSession {
         } onCancel: { child.close(throwing: CancellationError()) }
     }
 
-    func requireSubscription() async throws {
+    @discardableResult
+    func requireSubscription() async throws -> SubscriptionAccount {
         let result = try await request("account/read", params: ["refreshToken": true])
         guard let account = result["account"] as? [String: Any] else { throw SubscriptionCLIError.signedOut("Codex") }
         guard account["type"] as? String == "chatgpt",
               let plan = account["planType"] as? String, !plan.isEmpty, plan.lowercased() != "free" else {
             throw SubscriptionCLIError.apiKeyAccount("Codex")
         }
+        let email = (account["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SubscriptionAccount(label: email.flatMap { $0.isEmpty ? nil : $0 } ?? "ChatGPT",
+                                   detail: "ChatGPT \(plan.capitalized)")
     }
 
     func models() async throws -> [OpenRouterModel] {
@@ -412,8 +443,13 @@ final class SubscriptionCodexSession {
             for entry in entries where entry["hidden"] as? Bool != true {
                 guard let id = entry["model"] as? String, !id.isEmpty, seen.insert(id).inserted else { continue }
                 let input = entry["inputModalities"] as? [String]
+                let efforts = (entry["supportedReasoningEfforts"] as? [[String: Any]])?.compactMap { effort -> ReasoningEffortOption? in
+                    guard let id = effort["reasoningEffort"] as? String, !id.isEmpty else { return nil }
+                    return ReasoningEffortOption(id: id, detail: effort["description"] as? String ?? "")
+                }
                 models.append(OpenRouterModel(id: id, name: entry["displayName"] as? String ?? id,
-                    context_length: nil, architecture: input.map { .init(input_modalities: $0, output_modalities: ["text"]) }))
+                    context_length: nil, architecture: input.map { .init(input_modalities: $0, output_modalities: ["text"]) },
+                    reasoningEfforts: efforts, defaultReasoningEffort: entry["defaultReasoningEffort"] as? String))
             }
             guard let next = page["nextCursor"] as? String, !next.isEmpty else { return models }
             cursor = next
